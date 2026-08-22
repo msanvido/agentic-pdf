@@ -27,23 +27,23 @@
   <span class="kicker">Specification · v1.0</span>
   <h1>Agent readability,<br>for <em>PDF documents</em>.</h1>
   <p class="lead">
-    PDFs are everywhere — reports, invoices, manuals, papers — and they are the
-    format AI agents handle worst. <strong>agentic-pdf</strong> is a specification
-    and open-source toolkit that embeds an invisible, machine-readable
-    markdown layer inside ordinary PDFs. Humans see exactly what they printed;
-    agents read clean structure in milliseconds.
+    PDFs carry most of the world's important information — reports, invoices,
+    contracts, manuals, research. <strong>agentic-pdf</strong> makes that
+    information natively readable by AI agents: printing embeds an invisible
+    markdown layer inside the ordinary PDF. Humans see exactly what they always
+    saw; agents read clean structure instantly.
   </p>
   <div class="actions">
     <a class="btn primary" href="viewer/">Try the viewer</a>
     <a class="btn" href="https://github.com/msanvido/agentic-pdf">GitHub ↗</a>
     <a class="btn" href="#reference">Read the spec</a>
   </div>
-</div>
+</section>
 
 <nav class="toc">
   <strong>On this page</strong>
   <ol>
-    <li><a href="#problem">The problem</a></li>
+    <li><a href="#problem">The opportunity</a></li>
     <li><a href="#how">How it works</a></li>
     <li><a href="#principles">Design principles</a></li>
     <li><a href="#checklist">Quick-start checklist</a></li>
@@ -59,20 +59,61 @@
 </nav>
 
 <section id="problem">
-  <h2>The problem</h2>
+  <h2>The opportunity</h2>
   <p>
-    When an AI agent encounters a PDF it must choose between two bad options:
-    run lossy OCR on scanned pages, or parse raw layout operators and guess
-    where headings end and table columns begin. Reading order breaks across
-    columns, tables collapse into noise, and metadata is often missing
-    entirely. The result: agents misquote, hallucinate, or skip your document.
+    PDFs are everywhere, and until now OCR engines and vision models have been
+    extremely powerful tools for extracting data from those rich documents and
+    feeding it into AI workloads. That pipeline works — but it exists for one
+    reason: PDFs were never designed with machines in mind, so every consumer
+    has to reconstruct meaning after the fact.
   </p>
-  <p class="muted">
-    The web solved this with the
-    <a href="https://vercel.com/kb/guide/agent-readability-spec">agent-readability spec</a> —
-    markdown mirrors, structured metadata, canonical links. Agentic PDF applies
-    the same ideas to the world's most stubborn document format.
+  <p>
+    The same shift is already happening on the web, where sites publish
+    markdown mirrors so agents can read them directly
+    (<a href="https://vercel.com/kb/guide/agent-readability-spec">agent readability</a>,
+    <a href="https://llmstxt.org/">llms.txt</a>). It should happen to other
+    documents too. Let's go to the source and make PDFs agentic-ready by design —
+    <strong>simpler</strong> (no reconstruction pipeline),
+    <strong>safer</strong> (exact text, no model guesswork), and
+    <strong>more cost effective</strong> (zero per-page extraction cost).
   </p>
+
+  <h3>How content reaches LLMs today</h3>
+  <table>
+    <tr><th>Approach</th><th>Examples</th><th>Considerations</th></tr>
+    <tr>
+      <td>Cloud OCR / document AI</td>
+      <td>AWS Textract, Google Document AI, Azure Document Intelligence</td>
+      <td>Mature and accurate on scans; per-page pricing, layout heuristics, infrastructure to run</td>
+    </tr>
+    <tr>
+      <td>Vision &amp; multimodal models</td>
+      <td>GPT-4o / Claude reading page images, Mistral OCR</td>
+      <td>Very flexible — reads anything; token-heavy (every page re-read by a model), cost scales with corpus size</td>
+    </tr>
+    <tr>
+      <td>Specialized PDF parsers</td>
+      <td>Adobe PDF Extract API, LlamaParse, Unstructured.io, Marker</td>
+      <td>Better structure awareness; still heuristic — tables and multi-column layouts can come out lossy or reordered</td>
+    </tr>
+    <tr>
+      <td><strong style="color:var(--green)">Agentic layer at the source</strong></td>
+      <td>this project</td>
+      <td>Deterministic: exact mirrored text embedded in the file. Zero extraction cost, no third party, works offline. Complements the tools above, which remain ideal for legacy scans</td>
+    </tr>
+  </table>
+
+  <div class="callout green">
+    <strong>The right tool for the job:</strong> scanned archives will always
+    need OCR. But most agentic-era documents are <em>born digital</em> — they
+    pass through a printer driver anyway. Printing them with the agent layer
+    built in means every downstream AI workload skips the extraction step
+    entirely.
+  </div>
+
+  <pre><code>Today:   PDF ──▶ OCR / vision model ──▶ cleanup &amp; repair ──▶ LLM   <span class="c">(per page, every time)</span>
+
+Agentic: PDF ──▶ extract agent.md ────────────────────────▶ LLM   <span class="c">(free, exact, instant)</span></code></pre>
 
   <div class="grid2">
     <div class="card"><span class="icon">👁</span><h3>Invisible to humans</h3><p>The agent layer uses standard PDF EmbeddedFiles. Nothing renders on any page; Preview, Acrobat, and every printer output look unchanged.</p></div>
