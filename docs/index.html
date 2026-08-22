@@ -2,199 +2,312 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="description" content="Static viewer for agentic PDFs — see the visual PDF and its hidden agent-readable markdown layer. Runs entirely in your browser; no uploads.">
-<meta property="og:title" content="Agentic PDF Viewer">
-<meta property="og:description" content="View a PDF and its hidden agent-readable layer (embedded agent.md) side by side, fully client-side.">
-<title>Agentic PDF Viewer</title>
-<style>
-  :root { --bg:#111; --panel:#1b1b1f; --fg:#e8e8ea; --accent:#6c8cff; --muted:#9a9aa2; }
-  * { box-sizing: border-box; }
-  body { margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; background:var(--bg); color:var(--fg); height:100vh; display:flex; flex-direction:column; }
-  header { display:flex; align-items:center; gap:12px; padding:10px 16px; background:var(--panel); border-bottom:1px solid #2a2a30; flex-wrap:wrap; }
-  header h1 { font-size:14px; font-weight:600; margin:0; white-space:nowrap; }
-  header h1 a { color:var(--fg); text-decoration:none; }
-  .badge { font-size:11px; padding:3px 8px; border-radius:999px; border:1px solid #3a3a42; color:var(--muted); }
-  .badge.ok { color:#7ee787; border-color:#2ea04366; }
-  .spacer { flex:1; }
-  label.btn, button.btn { background:#33333a; color:var(--fg); border:none; padding:7px 12px; border-radius:8px; cursor:pointer; font-size:12px; }
-  button.btn.primary { background:var(--accent); color:#fff; }
-  input[type=file] { display:none; }
-  main { flex:1; display:flex; overflow:hidden; position:relative; }
-  #pdf-pane { flex:1.4; overflow-y:auto; padding:16px; min-width:0; }
-  #pdf-pane canvas { display:block; margin:0 auto 16px; max-width:100%; box-shadow:0 4px 24px rgba(0,0,0,.5); background:#fff; border-radius:4px; }
-  .empty { color:var(--muted); text-align:center; padding-top:20vh; font-size:14px; line-height:1.8; }
-  .empty code { background:#26262c; padding:2px 6px; border-radius:4px; }
-  #agent-pane { width:44%; max-width:640px; border-left:1px solid #2a2a30; display:flex; flex-direction:column; background:var(--panel); }
-  #agent-pane.hidden { display:none; }
-  .tabs { display:flex; border-bottom:1px solid #2a2a30; }
-  .tabs button { flex:1; background:none; border:none; color:var(--muted); padding:9px; font-size:12px; cursor:pointer; border-bottom:2px solid transparent; }
-  .tabs button.active { color:var(--fg); border-bottom-color:var(--accent); }
-  #agent-content, #agent-raw { flex:1; overflow-y:auto; padding:18px 20px; }
-  #agent-content { line-height:1.65; font-size:14px; }
-  #agent-content h1 { font-size:22px; } 
-  #agent-content h2 { font-size:17px; margin-top:1.6em; border-bottom:1px solid #2e2e35; padding-bottom:4px; }
-  #agent-content h3, #agent-content h4 { font-size:14px; color:var(--muted); }
-  #agent-content ul { padding-left:1.3em; }
-  #agent-content li { margin:.25em 0; }
-  #agent-content code { background:#26262c; padding:2px 5px; border-radius:4px; font-size:12px; }
-  #agent-content pre { background:#222228; padding:12px; border-radius:8px; overflow-x:auto; }
-  #agent-content a { color:var(--accent); }
-  #agent-content blockquote { border-left:3px solid var(--accent); margin-left:0; padding-left:12px; color:var(--muted); }
-  #agent-raw { margin:0; font-family:"SF Mono",Menlo,monospace; font-size:12px; white-space:pre-wrap; word-break:break-word; color:#c8e1ff; }
-  .fm { background:#20202a; border:1px solid #30303a; border-radius:8px; padding:10px 12px; margin-bottom:16px; font-family:monospace; font-size:11px; color:var(--muted); white-space:pre-wrap; }
-</style>
+<title>Agentic PDF — Agent Readability for PDF Documents</title>
+<meta name="description" content="A specification and toolkit for making PDF documents readable by AI agents: a hidden markdown layer embedded in ordinary PDFs, with a printer driver, viewer, and verification tools.">
+<meta property="og:title" content="Agentic PDF — Agent Readability for PDFs">
+<meta property="og:description" content="Humans see a normal PDF. AI agents get a clean, structured markdown mirror embedded invisibly inside the same file.">
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
-<header>
-  <h1><a href="https://github.com/msanvido/agentic-pdf">Agentic PDF Viewer</a></h1>
-  <span class="badge" id="layer-badge">no file loaded</span>
-  <span class="spacer"></span>
-  <label class="btn" for="file-input">Open local PDF…</label>
-  <input type="file" id="file-input" accept="application/pdf,.pdf">
-  <button class="btn primary" id="toggle-agent" disabled>Agent layer</button>
+
+<header class="site-header">
+  <a class="logo" href="/">agentic<span>-pdf</span></a>
+  <nav>
+    <a href="#how">How it works</a>
+    <a href="#checklist">Checklist</a>
+    <a href="#reference">Spec</a>
+    <a href="#tooling">Tooling</a>
+    <a class="cta" href="viewer/">Open viewer →</a>
+  </nav>
 </header>
-<main>
-  <div id="pdf-pane">
-    <div class="empty" id="empty-state">
-      Load an <strong>agentic PDF</strong> to inspect it.<br>
-      Append <code>?file=demo/sample.agent.pdf</code> to the URL,<br>
-      or open a file from disk — everything stays in your browser.
-    </div>
+
+<div class="wrap">
+
+<section class="hero" id="top">
+  <span class="kicker">Specification · v1.0</span>
+  <h1>Agent readability,<br>for <em>PDF documents</em>.</h1>
+  <p class="lead">
+    PDFs are everywhere — reports, invoices, manuals, papers — and they are the
+    format AI agents handle worst. <strong>agentic-pdf</strong> is a specification
+    and open-source toolkit that embeds an invisible, machine-readable
+    markdown layer inside ordinary PDFs. Humans see exactly what they printed;
+    agents read clean structure in milliseconds.
+  </p>
+  <div class="actions">
+    <a class="btn primary" href="viewer/">Try the viewer</a>
+    <a class="btn" href="https://github.com/msanvido/agentic-pdf">GitHub ↗</a>
+    <a class="btn" href="#reference">Read the spec</a>
   </div>
-  <aside id="agent-pane" class="hidden">
-    <div class="tabs">
-      <button id="tab-rendered" class="active">Rendered</button>
-      <button id="tab-raw">Raw markdown</button>
-    </div>
-    <div id="agent-content"></div>
-    <pre id="agent-raw" hidden></pre>
-  </aside>
-</main>
+</div>
 
-<script type="module">
-  import * as pdfjsLib from "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.min.mjs";
-  import { marked } from "https://cdn.jsdelivr.net/npm/marked@15.0.7/lib/marked.esm.js";
+<nav class="toc">
+  <strong>On this page</strong>
+  <ol>
+    <li><a href="#problem">The problem</a></li>
+    <li><a href="#how">How it works</a></li>
+    <li><a href="#principles">Design principles</a></li>
+    <li><a href="#checklist">Quick-start checklist</a></li>
+    <li><a href="#document-level">Document-level requirements</a></li>
+    <li><a href="#layer-structure">Layer structure</a></li>
+    <li><a href="#metadata">Metadata &amp; discovery</a></li>
+    <li><a href="#transport">Transport &amp; negotiation</a></li>
+    <li><a href="#webmapping">Mapping from the web spec</a></li>
+    <li><a href="#verification">Verification &amp; scoring</a></li>
+    <li><a href="#tooling">Tooling</a></li>
+    <li><a href="#agents">For agent authors</a></li>
+  </ol>
+</nav>
 
-  pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.worker.min.mjs";
+<section id="problem">
+  <h2>The problem</h2>
+  <p>
+    When an AI agent encounters a PDF it must choose between two bad options:
+    run lossy OCR on scanned pages, or parse raw layout operators and guess
+    where headings end and table columns begin. Reading order breaks across
+    columns, tables collapse into noise, and metadata is often missing
+    entirely. The result: agents misquote, hallucinate, or skip your document.
+  </p>
+  <p class="muted">
+    The web solved this with the
+    <a href="https://vercel.com/kb/guide/agent-readability-spec">agent-readability spec</a> —
+    markdown mirrors, structured metadata, canonical links. Agentic PDF applies
+    the same ideas to the world's most stubborn document format.
+  </p>
 
-  const pane = document.getElementById("pdf-pane");
-  const badge = document.getElementById("layer-badge");
-  const agentPane = document.getElementById("agent-pane");
-  const toggleBtn = document.getElementById("toggle-agent");
-  const renderedEl = document.getElementById("agent-content");
-  const rawEl = document.getElementById("agent-raw");
-  const tabR = document.getElementById("tab-rendered");
-  const tabW = document.getElementById("tab-raw");
-  let currentDoc = null;
+  <div class="grid2">
+    <div class="card"><span class="icon">👁</span><h3>Invisible to humans</h3><p>The agent layer uses standard PDF EmbeddedFiles. Nothing renders on any page; Preview, Acrobat, and every printer output look unchanged.</p></div>
+    <div class="card"><span class="icon">🤖</span><h3>First-class for agents</h3><p>No OCR, no layout heuristics. Agents extract one attachment and get frontmatter, headings, lists, and glossary as plain markdown.</p></div>
+    <div class="card"><span class="icon">🖨</span><h3>Printable by anyone</h3><p>A CLI driver and a CUPS virtual printer mean any app's Print dialog can produce agentic PDFs — no changes to the source application.</p></div>
+    <div class="card"><span class="icon">🔍</span><h3>Verifiable</h3><p>A one-command check reports whether a file carries a conforming layer, which spec version, and its metadata.</p></div>
+  </div>
+</section>
 
-  tabR.onclick = () => switchTab(true);
-  tabW.onclick = () => switchTab(false);
-  function switchTab(rendered) {
-    tabR.classList.toggle("active", rendered);
-    tabW.classList.toggle("active", !rendered);
-    renderedEl.hidden = !rendered;
-    rawEl.hidden = rendered;
-  }
+<section id="how">
+  <h2>How it works</h2>
+  <p>
+    An agentic PDF is a normal PDF plus a set of named attachments defined by
+    this specification. The attachments ride along inside the file:
+  </p>
+  <table>
+    <tr><th>Attachment</th><th>Status</th><th>Content</th></tr>
+    <tr><td><code>agent.md</code></td><td><strong style="color:var(--green)">required</strong></td><td>Markdown mirror of the document with YAML frontmatter (the primary agent interface)</td></tr>
+    <tr><td><code>agent.html</code></td><td>recommended</td><td>HTML rendering of the mirror, with <code>&lt;meta&gt;</code> / OpenGraph tags</td></tr>
+    <tr><td><code>llms.txt</code></td><td>optional</td><td>Index of related documents, for bundles and archives</td></tr>
+  </table>
+  <pre><code>┌──────────────────────────────────────────────┐
+│  report.pdf                                  │
+│                                              │
+│  Pages 1–12   ← what humans see (unchanged)  │
+│                                              │
+│  EmbeddedFiles:                              │
+│    ├── agent.md    ← what agents read        │
+│    ├── agent.html  ← HTML mirror             │
+│    └── llms.txt    ← bundle index (optional) │
+│                                              │
+│  Info dict: Title, Subject,                  │
+│             AgentReadability, CanonicalSource│
+└──────────────────────────────────────────────┘</code></pre>
+</section>
 
-  toggleBtn.onclick = () => {
-    if (!toggleBtn.disabled) {
-      agentPane.classList.toggle("hidden");
-      toggleBtn.classList.toggle("primary", agentPane.classList.contains("hidden"));
-    }
-  };
+<section id="principles">
+  <h2>Design principles</h2>
+  <ul class="checklist">
+    <li><strong>Zero visual change.</strong> If printing or viewing the PDF would differ in any way from a non-agentic copy, the implementation is broken.</li>
+    <li><strong>One extraction, full fidelity.</strong> Everything an agent needs must be in <code>agent.md</code>. It should never need to fall back to text scraping.</li>
+    <li><strong>Standard mechanisms only.</strong> PDF 1.7+ EmbeddedFiles and the Info dictionary — no proprietary sidecars or network calls.</li>
+    <li><strong>Degradable.</strong> Removing the attachments yields a perfectly valid legacy PDF.</li>
+    <li><strong>Honest mirrors.</strong> The markdown must mirror actual page content, not summaries or interpretations.</li>
+  </ul>
+</section>
 
-  document.getElementById("file-input").onchange = async (e) => {
-    const f = e.target.files[0];
-    if (f) loadPdf(new Uint8Array(await f.arrayBuffer()), f.name);
-  };
+<section id="checklist">
+  <h2>Quick-start checklist</h2>
+  <p class="muted">Produce a conforming document with:</p>
+  <pre><code><span class="c"># print any convertible file into an agentic PDF</span>
+agentic-pdf print quarterly-report.txt -o report.pdf
 
-  // ?file=<relative path> — same-origin only
-  const params = new URLSearchParams(location.search);
-  const fileParam = params.get("file");
-  if (fileParam) {
-    if (/^(https?:)?\/\//i.test(fileParam) || fileParam.startsWith("/")) {
-      showError("Only same-origin relative paths are supported (?file=…).");
-    } else {
-      try {
-        const res = await fetch(fileParam);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        loadPdf(new Uint8Array(await res.arrayBuffer()), fileParam);
-      } catch (err) {
-        showError(`Could not load ${fileParam}: ${err.message}`);
-      }
-    }
-  }
+<span class="c"># verify the layer</span>
+agentic-pdf check report.pdf
 
-  function showError(msg) {
-    pane.innerHTML = `<div class="empty">⚠️ ${msg}</div>`;
-  }
+<span class="c"># hand the markdown straight to an LLM</span>
+agentic-pdf read report.pdf --raw | llm "summarize this"</code></pre>
+  <ul class="checklist">
+    <li><code>agent.md</code> attachment present, MIME type <code>text/markdown</code></li>
+    <li>Frontmatter includes <code>title</code>, <code>description</code> (50+ chars), <code>doc_version</code>, <code>last_updated</code>, <code>generator</code></li>
+    <li>Body contains <code># Title</code>, <code>## Summary</code>, <code>## Content</code>, <code>## Sitemap</code>, <code>## Glossary</code> sections</li>
+    <li>Info dictionary sets <code>AgentReadability</code> = <code>agentic-pdf-spec/1.0</code></li>
+    <li>Canonical source recorded via frontmatter <code>canonical</code> and Info key <code>CanonicalSource</code></li>
+    <li>Visual pages byte-for-byte equivalent in appearance to a non-agentic print</li>
+    <li>(Recommended) <code>agent.html</code> mirror attached with meta description + og tags</li>
+  </ul>
+</section>
 
-  async function loadPdf(data, name) {
-    // reset UI
-    pane.innerHTML = "";
-    renderedEl.innerHTML = "";
-    rawEl.textContent = "";
-    badge.textContent = "loading…";
-    badge.className = "badge";
-    agentPane.classList.add("hidden");
+<section id="document-level">
+  <h2 id="document-level">Document-level requirements</h2>
 
-    currentDoc = await pdfjsLib.getDocument({ data }).promise;
-    for (let i = 1; i <= currentDoc.numPages; i++) {
-      const page = await currentDoc.getPage(i);
-      const base = page.getViewport({ scale: 1 });
-      const scale = Math.min(1.6, (pane.clientWidth - 32) / base.width);
-      const viewport = page.getViewport({ scale });
-      const canvas = document.createElement("canvas");
-      canvas.width = viewport.width * devicePixelRatio;
-      canvas.height = viewport.height * devicePixelRatio;
-      canvas.style.width = viewport.width + "px";
-      canvas.style.height = viewport.height + "px";
-      pane.appendChild(canvas);
-      await page.render({
-        canvasContext: canvas.getContext("2d"),
-        ...(devicePixelRatio !== 1 ? { transform: [devicePixelRatio, 0, 0, devicePixelRatio, 0, 0] } : {}),
-        viewport,
-      }).promise;
-    }
+  <h3>Frontmatter fields (<code>agent.md</code>)</h3>
+  <table>
+    <tr><th>Field</th><th>Required</th><th>Description</th></tr>
+    <tr><td><code>title</code></td><td>yes</td><td>Human-readable document title; should match the visible title page</td></tr>
+    <tr><td><code>description</code></td><td>yes</td><td>≥ 50 characters summarizing the document; also written to the PDF <code>Subject</code></td></tr>
+    <tr><td><code>doc_version</code></td><td>yes</td><td>Version of <em>this document</em>, not the spec (e.g. <code>"2.1"</code>)</td></tr>
+    <tr><td><code>last_updated</code></td><td>yes</td><td>ISO-8601 timestamp of last modification</td></tr>
+    <tr><td><code>canonical</code></td><td>recommended</td><td>URI of the authoritative source (file path or URL)</td></tr>
+    <tr><td><code>generator</code></td><td>yes</td><td>Tool + spec version, e.g. <code>"agentic-pdf/0.2.0"</code></td></tr>
+    <tr><td><code>source_pages</code></td><td>optional</td><td>Page count, so agents can gauge completeness</td></tr>
+  </table>
 
-    await showAgentLayer();
-    document.title = `${name} — Agentic PDF Viewer`;
-  }
+  <h3>Info dictionary keys</h3>
+  <table>
+    <tr><th>Key</th><th>Value</th><th>Purpose</th></tr>
+    <tr><td><code>AgentReadability</code></td><td><code>agentic-pdf-spec/1.0</code></td><td>Marks conformance and spec version — the "this PDF is agent-readable" flag</td></tr>
+    <tr><td><code>CanonicalSource</code></td><td>URI string</td><td>Authoritative source location</td></tr>
+    <tr><td><code>Title</code> / <code>Subject</code></td><td>mirrors frontmatter</td><td>Standard PDF metadata stays consistent with the layer</td></tr>
+    <tr><td><code>Keywords</code></td><td><code>agent-readable agentic-pdf llm-readable</code></td><td>Searchable marker for indexing tools</td></tr>
+  </table>
+</section>
 
-  async function showAgentLayer() {
-    const attachments = await currentDoc.getAttachments();
-    const mdEntry =
-      attachments["agent.md"] ??
-      Object.entries(attachments).find(([k]) => k.endsWith(".md"))?.[1];
+<section id="layer-structure">
+  <h2>Layer structure</h2>
+  <p>
+    Section headings are load-bearing: agents use them to route queries and
+    quote precisely. Every conforming <code>agent.md</code> contains at least these H2 sections, in order:
+  </p>
+  <table>
+    <tr><th>Section</th><th>Contents</th></tr>
+    <tr><td><code># &lt;Title&gt;</code></td><td>Single top-level heading matching the frontmatter title</td></tr>
+    <tr><td><code>## Summary</code></td><td>The description — enough context to decide relevance without reading further</td></tr>
+    <tr><td><code>## Table of Contents</code></td><td>Links/list of major sections (when 2+ exist)</td></tr>
+    <tr><td><code>## Content</code></td><td>The mirrored document body, structured into headings, paragraphs and lists; per-page anchors (<code>_​(p.N)_</code>) preserve provenance back to visual pages</td></tr>
+    <tr><td><code>## Sitemap</code></td><td>Inventory of this file, sibling attachments, and the canonical PDF</td></tr>
+    <tr><td><code>## Glossary</code></td><td>Recurring terminology and acronyms with occurrence counts, resolving ambiguity</td></tr>
+  </table>
+  <div class="callout">
+    <strong>Fidelity rule:</strong> the Content section must be derivable from
+    the rendered pages. Generators may restructure (headings, bullets,
+    paragraphs) but must not omit substantive text or add commentary.
+  </div>
+</section>
 
-    if (!mdEntry || !mdEntry.content) {
-      badge.textContent = "no agentic layer";
-      toggleBtn.disabled = true;
-      return;
-    }
+<section id="metadata">
+  <h2>Metadata &amp; discovery</h2>
+  <p>
+    Discovery follows the web spec's principle that agents shouldn't have to
+    guess how to consume a resource — the document itself advertises its layer:
+  </p>
+  <ul class="checklist">
+    <li>The presence of the <code>AgentReadability</code> Info key is the machine-checkable declaration of conformance.</li>
+    <li><code>Keywords</code> include <code>agent-readable</code> so corpus-wide indexing can find agentic files.</li>
+    <li>Bundles SHOULD provide <code>llms.txt</code> listing member documents and their relationships.</li>
+    <li>The <code>canonical</code>/`CanonicalSource` pair lets agents deduplicate against web or filesystem sources, mirroring `<link rel="canonical">` semantics.</li>
+  </ul>
+</section>
 
-    const text = new TextDecoder().decode(mdEntry.content);
-    badge.textContent = "agentic layer ✔";
-    badge.className = "badge ok";
-    toggleBtn.disabled = false;
-    rawEl.textContent = text;
+<section id="transport">
+  <h2>Transport &amp; content negotiation</h2>
+  <p>
+    When an agentic PDF is served over HTTP (by the bundled viewer or any
+    static host), conforming endpoints behave like the web spec's markdown
+    mirrors:
+  </p>
+  <table>
+    <tr><th>Request</th><th>Response</th></tr>
+    <tr><td><code>GET /doc.pdf</code></td><td>The original visual PDF, <code>application/pdf</code></td></tr>
+    <tr><td><code>GET /agent.md</code></td><td>Raw layer, <code>text/markdown; charset=utf-8</code>, with <code>Link: &lt;/doc.pdf&gt;; rel="canonical"</code></td></tr>
+    <tr><td><code>GET /agent.html</code></td><td>HTML rendering of the layer</td></tr>
+    <tr><td><code>GET /</code> + <code>Accept: text/markdown</code></td><td>Raw layer — content negotiation, as if the PDF were a webpage with a <code>.md</code> mirror</td></tr>
+  </table>
+</section>
 
-    const m = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/.exec(text);
-    let body = text;
-    if (m) {
-      body = text.slice(m[0].length);
-      const card = document.createElement("div");
-      card.className = "fm";
-      card.textContent = m[1];
-      renderedEl.appendChild(card);
-    }
-    const holder = document.createElement("div");
-    holder.innerHTML = marked.parse(body);
-    renderedEl.appendChild(holder);
+<section id="webmapping">
+  <h2>Mapping from the web spec</h2>
+  <table>
+    <tr><th>Vercel web-spec concept</th><th>Agentic PDF equivalent</th></tr>
+    <tr><td>Markdown mirror (page.md)</td><td><code>agent.md</code> embedded file</td></tr>
+    <tr><td><code>&lt;link rel="alternate" type="text/markdown"&gt;</code></td><td>Attachment presence + viewer endpoints above</td></tr>
+    <tr><td><code>&lt;meta name="description"&gt;</code>, og tags</td><td>Frontmatter <code>description</code>; <code>agent.html</code> carries real meta/og tags</td></tr>
+    <tr><td><code>&lt;link rel="canonical"&gt;</code></td><td>Frontmatter <code>canonical</code> + Info key <code>CanonicalSource</code> + <code>Link</code> header</td></tr>
+    <tr><td>JSON-LD <code>dateModified</code>, headline</td><td>Frontmatter <code>last_updated</code>, <code>title</code>; PDF <code>ModDate</code>/<code>Title</code></td></tr>
+    <tr><td>3+ section headings per page</td><td>Required H2 skeleton (Summary / Content / Sitemap / Glossary)</td></tr>
+    <tr><td>Sitemap (sitemap.md / sitemap.xml)</td><td><code>## Sitemap</code> section; optional <code>llms.txt</code> for bundles</td></tr>
+    <tr><td>Glossary link</td><td><code>## Glossary</code> section with recurring terms</td></tr>
+    <tr><td>Content negotiation (<code>Accept: text/markdown</code>)</td><td>Negotiation endpoints on serving viewers</td></tr>
+    <tr><td>Fenced code blocks with languages</td><td>Preserved verbatim in the Content section</td></tr>
+  </table>
+</section>
 
-    agentPane.classList.remove("hidden");
-    toggleBtn.classList.remove("primary");
-  }
-</script>
+<section id="verification">
+  <h2>Verification &amp; scoring</h2>
+  <p>Score a document the way the web spec scores a site — passed checks over total checks:</p>
+  <pre><code>score = round(passed checks / total checks × 100)</code></pre>
+  <table>
+    <tr><th>Check</th><th>Weight</th></tr>
+    <tr><td><code>agent.md</code> present and non-empty</td><td>required — score is 0 without it</td></tr>
+    <tr><td>All required frontmatter fields present; description ≥ 50 chars</td><td>high</td></tr>
+    <tr><td>Required H2 skeleton present</td><td>high</td></tr>
+    <tr><td><code>AgentReadability</code> Info key matches this spec version</td><td>medium</td></tr>
+    <tr><td>Canonical source declared (frontmatter and/or Info)</td><td>medium</td></tr>
+    <tr><td><code>agent.html</code> mirror present with meta tags</td><td>low</td></tr>
+    <tr><td>Glossary covers detected terminology</td><td>low</td></tr>
+  </table>
+  <p class="muted">Ratings: 90–100 excellent · 70–89 good · 50–89 fair · below 50 needs work.</p>
+  <div class="callout green">
+    <strong>Verify now:</strong> drop any PDF into the
+    <a href="viewer/">viewer</a> — it renders the visual pages, extracts
+    <code>agent.md</code> client-side, and shows the badge
+    <span style="color:var(--green)">agentic layer ✔</span> only for conforming files.
+    Or run <code>agentic-pdf check file.pdf</code>.
+  </div>
+</section>
+
+<section id="tooling">
+  <h2>Tooling</h2>
+  <p>
+    The reference implementation is a single Go binary (~11 MB) with no runtime dependencies:
+  </p>
+  <pre><code><span class="c"># install</span>
+git clone https://github.com/msanvido/agentic-pdf && cd agentic-pdf
+make build            <span class="c"># → bin/agentic-pdf (also: make cross for all platforms)</span>
+
+<span class="c"># print anything printable into an agentic PDF</span>
+agentic-pdf print memo.txt -o memo.pdf
+agentic-pdf print scan.pdf --title "Q3 Report" --canonical https://example.com/q3
+
+<span class="c"># macOS system printer — appears in every Print dialog</span>
+sudo agentic-pdf install-backend
+
+<span class="c"># local viewer at http://localhost:4173/?file=doc.pdf</span>
+agentic-pdf view memo.pdf</code></pre>
+  <p class="muted">
+    Non-PDF input is converted through the platform's CUPS filter chain;
+    PDF input passes through untouched except for the added layer.
+  </p>
+</section>
+
+<section id="agents">
+  <h2>For agent authors</h2>
+  <p>If you are an AI agent reading this site, consuming an agentic PDF takes one step:</p>
+  <pre><code><span class="c"># extract the EmbeddedFile named "agent.md" (MIME text/markdown):</span>
+agentic-pdf read doc.pdf --raw
+
+<span class="c"># no CLI? any PDF library works — e.g. Python:</span>
+python -c "import pikepdf; \
+  print(pikepdf.open('doc.pdf').attachments['agent.md'])"</code></pre>
+  <p>
+    Trust the frontmatter for citation metadata (<code>title</code>,
+    <code>last_updated</code>, <code>canonical</code>), use the
+    <code>## Content</code> section for retrieval, and treat the visual pages
+    as the human-facing rendering of the same information.
+  </p>
+</section>
+
+<footer class="site-footer">
+  <span>agentic-pdf · spec v1.0</span>
+  <a href="https://github.com/msanvido/agentic-pdf">GitHub</a>
+  <a href="viewer/">Viewer</a>
+  <a href="https://vercel.com/kb/guide/agent-readability-spec">Inspiration: Vercel agent-readability spec</a>
+</footer>
+
+</div>
 </body>
 </html>

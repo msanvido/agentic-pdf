@@ -27,6 +27,10 @@ The package ships two halves:
 In short: humans see the same PDF they always did; agents get a first-class,
 structured copy of the same content riding along invisibly inside the file.
 
+A hosted version of the spec guide and the viewer lives at
+<https://msanvido.github.io/agentic-pdf/> — the viewer there runs fully
+client-side, so you can inspect your own agentic PDFs without installing anything.
+
 ## How it works
 
 The agentic layer uses the PDF standard **EmbeddedFiles** (attachment) feature:
@@ -131,7 +135,7 @@ cmd/agentic-pdf/       CLI entrypoint (print/read/view/check/install-backend)
 internal/core/         spec, text extraction, markdown generation, inject/extract
 internal/cli/          command implementations + CUPS backend installer
 internal/viewer/       local viewer server; viewer.html is shared with GitHub Pages
-docs/                  GitHub Pages: fully client-side viewer (pdf.js extracts agent.md in-browser)
+docs/                  GitHub Pages site: spec guide (index.html) + client-side viewer (viewer/)
 demo/                  sample files
 ```
 

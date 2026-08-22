@@ -21,8 +21,9 @@ cross:
 	done
 
 # The local viewer and the GitHub Pages viewer share the same HTML.
+# (The Pages site lives in docs/: index = spec guide, viewer/ = viewer.)
 sync-viewer:
-	cp internal/viewer/viewer.html docs/index.html
+	cp internal/viewer/viewer.html docs/viewer/index.html
 
 clean:
 	rm -rf bin dist
