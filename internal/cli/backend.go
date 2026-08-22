@@ -1,0 +1,133 @@
+package cli
+
+import (
+	"encoding/json"
+	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"runtime"
+	"strings"
+)
+
+func toJSON(v any) string {
+	b, _ := json.MarshalIndent(v, "", "  ")
+	return string(b)
+}
+
+// InstallBackend installs the CUPS virtual printer (macOS/Linux with CUPS).
+func InstallBackend(spool string) error {
+	if spool == "" {
+		home, _ := os.UserHomeDir()
+		spool = filepath.Join(home, "Documents", "Agentic-PDF")
+	}
+	exe, err := os.Executable()
+	if err != nil {
+		return fmt.Errorf("resolving executable path: %w", err)
+	}
+
+	script := buildBackendScript(exe, spool)
+	tmpScript := "/tmp/agentic-pdf-backend-agentpdf"
+	if err := os.WriteFile(tmpScript, []byte(script), 0o755); err != nil {
+		return err
+	}
+	if err := os.MkdirAll(spool, 0o755); err != nil {
+		return err
+	}
+
+	fmt.Fprintln(os.Stderr, "Installing CUPS backend (requires sudo)…")
+	run("sudo", "cp", tmpScript, "/usr/libexec/cups/backend/agentpdf")
+	run("sudo", "chown", "root:wheel", "/usr/libexec/cups/backend/agentpdf")
+	run("sudo", "chmod", "755", "/usr/libexec/cups/backend/agentpdf")
+	run("sudo", "mkdir", "-p", spool)
+	if u := os.Getenv("USER"); u != "" {
+		run("sudo", "chown", u+":staff", spool)
+	}
+	run("sudo", "lpadmin", "-p", "AgenticPDF", "-E", "-v", "agentpdf:"+spool, "-D", "Agentic PDF Printer")
+	run("sudo", "launchctl", "kickstart", "-k", "system/org.cups.cupsd")
+
+	fmt.Printf(`✅ Installed "Agentic PDF Printer".
+   - Backend: /usr/libexec/cups/backend/agentpdf
+   - Queue:   AgenticPDF
+   - Output:  %s
+Print from any app and pick "Agentic PDF Printer" — the resulting PDF lands
+in the output folder with an embedded agent-readable layer.
+`, spool)
+	return nil
+}
+
+// UninstallBackend removes the CUPS virtual printer.
+func UninstallBackend() error {
+	fmt.Fprintln(os.Stderr, "Removing CUPS backend (requires sudo)…")
+	tryRun("sudo", "lpadmin", "-x", "AgenticPDF")
+	run("sudo", "rm", "-f", "/usr/libexec/cups/backend/agentpdf")
+	run("sudo", "launchctl", "kickstart", "-k", "system/org.cups.cupsd")
+	fmt.Println("✅ Uninstalled.")
+	return nil
+}
+
+func buildBackendScript(cliPath, spool string) string {
+	return `#!/bin/sh
+# CUPS backend for agentic-pdf — converts print jobs into agentic PDFs.
+
+# Discovery (no args): advertise the device.
+if [ $# -eq 0 ]; then
+  echo "network agentpdf \"Agentic PDF Printer\" \"Prints to agentic PDFs with an embedded agent-readable layer\""
+  exit 0
+fi
+
+job_id="$1"; user="$2"; title="$3"; copies="$4"; options="$5"; file="$6"
+SPOOL_DIR="` + spool + `"
+
+mkdir -p "$SPOOL_DIR" 2>/dev/null || exit 1
+
+tmp_in=$(mktemp /tmp/agentpdf.XXXXXX)
+if [ -n "$file" ] && [ -r "$file" ]; then
+  cp "$file" "$tmp_in"
+else
+  cat > "$tmp_in"
+fi
+
+safe_title=$(printf '%s' "$title" | tr '/:' '__' | cut -c1-80)
+out="$SPOOL_DIR/$safe_title-$job_id.pdf"
+
+"` + cliPath + `" print "$tmp_in" -o "$out" --title "$title" >/dev/null 2>&1
+rc=$?
+rm -f "$tmp_in"
+[ $rc -ne 0 ] && { echo "ERROR: agentic conversion failed"; exit 1; }
+chmod 644 "$out" 2>/dev/null
+
+echo "READY"
+exit 0
+`
+}
+
+func run(name string, args ...string) {
+	cmd := exec.Command(name, args...)
+	cmd.Stdout = os.Stderr
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		die(fmt.Sprintf("%s failed: %v", name, err))
+	}
+}
+
+func tryRun(name string, args ...string) {
+	_ = exec.Command(name, args...).Run()
+}
+
+func die(msg string) {
+	fmt.Fprintf(os.Stderr, "error: %s\n", msg)
+	os.Exit(1)
+}
+
+// OpenBrowser opens url in the default browser.
+func OpenBrowser(url string) {
+	switch runtime.GOOS {
+	case "darwin":
+		tryRun("open", url)
+	case "windows":
+		tryRun("cmd", "/c", "start", strings.ReplaceAll(url, "&", "^&"))
+	default:
+		tryRun("xdg-open", url)
+	}
+}

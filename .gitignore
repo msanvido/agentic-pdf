@@ -1,4 +1,4 @@
-node_modules/
+bin/
 dist/
 demo/*.agent.pdf
 demo/multipage.pdf

@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="description" content="Static viewer for agentic PDFs — see the visual PDF and its hidden agent-readable markdown layer. Runs entirely in your browser; no uploads.">
+<meta property="og:title" content="Agentic PDF Viewer">
+<meta property="og:description" content="View a PDF and its hidden agent-readable layer (embedded agent.md) side by side, fully client-side.">
+<title>Agentic PDF Viewer</title>
+<style>
+  :root { --bg:#111; --panel:#1b1b1f; --fg:#e8e8ea; --accent:#6c8cff; --muted:#9a9aa2; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; background:var(--bg); color:var(--fg); height:100vh; display:flex; flex-direction:column; }
+  header { display:flex; align-items:center; gap:12px; padding:10px 16px; background:var(--panel); border-bottom:1px solid #2a2a30; flex-wrap:wrap; }
+  header h1 { font-size:14px; font-weight:600; margin:0; white-space:nowrap; }
+  header h1 a { color:var(--fg); text-decoration:none; }
+  .badge { font-size:11px; padding:3px 8px; border-radius:999px; border:1px solid #3a3a42; color:var(--muted); }
+  .badge.ok { color:#7ee787; border-color:#2ea04366; }
+  .spacer { flex:1; }
+  label.btn, button.btn { background:#33333a; color:var(--fg); border:none; padding:7px 12px; border-radius:8px; cursor:pointer; font-size:12px; }
+  button.btn.primary { background:var(--accent); color:#fff; }
+  input[type=file] { display:none; }
+  main { flex:1; display:flex; overflow:hidden; position:relative; }
+  #pdf-pane { flex:1.4; overflow-y:auto; padding:16px; min-width:0; }
+  #pdf-pane canvas { display:block; margin:0 auto 16px; max-width:100%; box-shadow:0 4px 24px rgba(0,0,0,.5); background:#fff; border-radius:4px; }
+  .empty { color:var(--muted); text-align:center; padding-top:20vh; font-size:14px; line-height:1.8; }
+  .empty code { background:#26262c; padding:2px 6px; border-radius:4px; }
+  #agent-pane { width:44%; max-width:640px; border-left:1px solid #2a2a30; display:flex; flex-direction:column; background:var(--panel); }
+  #agent-pane.hidden { display:none; }
+  .tabs { display:flex; border-bottom:1px solid #2a2a30; }
+  .tabs button { flex:1; background:none; border:none; color:var(--muted); padding:9px; font-size:12px; cursor:pointer; border-bottom:2px solid transparent; }
+  .tabs button.active { color:var(--fg); border-bottom-color:var(--accent); }
+  #agent-content, #agent-raw { flex:1; overflow-y:auto; padding:18px 20px; }
+  #agent-content { line-height:1.65; font-size:14px; }
+  #agent-content h1 { font-size:22px; } 
+  #agent-content h2 { font-size:17px; margin-top:1.6em; border-bottom:1px solid #2e2e35; padding-bottom:4px; }
+  #agent-content h3, #agent-content h4 { font-size:14px; color:var(--muted); }
+  #agent-content ul { padding-left:1.3em; }
+  #agent-content li { margin:.25em 0; }
+  #agent-content code { background:#26262c; padding:2px 5px; border-radius:4px; font-size:12px; }
+  #agent-content pre { background:#222228; padding:12px; border-radius:8px; overflow-x:auto; }
+  #agent-content a { color:var(--accent); }
+  #agent-content blockquote { border-left:3px solid var(--accent); margin-left:0; padding-left:12px; color:var(--muted); }
+  #agent-raw { margin:0; font-family:"SF Mono",Menlo,monospace; font-size:12px; white-space:pre-wrap; word-break:break-word; color:#c8e1ff; }
+  .fm { background:#20202a; border:1px solid #30303a; border-radius:8px; padding:10px 12px; margin-bottom:16px; font-family:monospace; font-size:11px; color:var(--muted); white-space:pre-wrap; }
+</style>
+</head>
+<body>
+<header>
+  <h1><a href="https://github.com/msanvido/agentic-pdf">Agentic PDF Viewer</a></h1>
+  <span class="badge" id="layer-badge">no file loaded</span>
+  <span class="spacer"></span>
+  <label class="btn" for="file-input">Open local PDF…</label>
+  <input type="file" id="file-input" accept="application/pdf,.pdf">
+  <button class="btn primary" id="toggle-agent" disabled>Agent layer</button>
+</header>
+<main>
+  <div id="pdf-pane">
+    <div class="empty" id="empty-state">
+      Load an <strong>agentic PDF</strong> to inspect it.<br>
+      Append <code>?file=demo/sample.agent.pdf</code> to the URL,<br>
+      or open a file from disk — everything stays in your browser.
+    </div>
+  </div>
+  <aside id="agent-pane" class="hidden">
+    <div class="tabs">
+      <button id="tab-rendered" class="active">Rendered</button>
+      <button id="tab-raw">Raw markdown</button>
+    </div>
+    <div id="agent-content"></div>
+    <pre id="agent-raw" hidden></pre>
+  </aside>
+</main>
+
+<script type="module">
+  import * as pdfjsLib from "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.min.mjs";
+  import { marked } from "https://cdn.jsdelivr.net/npm/marked@15.0.7/lib/marked.esm.js";
+
+  pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.worker.min.mjs";
+
+  const pane = document.getElementById("pdf-pane");
+  const badge = document.getElementById("layer-badge");
+  const agentPane = document.getElementById("agent-pane");
+  const toggleBtn = document.getElementById("toggle-agent");
+  const renderedEl = document.getElementById("agent-content");
+  const rawEl = document.getElementById("agent-raw");
+  const tabR = document.getElementById("tab-rendered");
+  const tabW = document.getElementById("tab-raw");
+  let currentDoc = null;
+
+  tabR.onclick = () => switchTab(true);
+  tabW.onclick = () => switchTab(false);
+  function switchTab(rendered) {
+    tabR.classList.toggle("active", rendered);
+    tabW.classList.toggle("active", !rendered);
+    renderedEl.hidden = !rendered;
+    rawEl.hidden = rendered;
+  }
+
+  toggleBtn.onclick = () => {
+    if (!toggleBtn.disabled) {
+      agentPane.classList.toggle("hidden");
+      toggleBtn.classList.toggle("primary", agentPane.classList.contains("hidden"));
+    }
+  };
+
+  document.getElementById("file-input").onchange = async (e) => {
+    const f = e.target.files[0];
+    if (f) loadPdf(new Uint8Array(await f.arrayBuffer()), f.name);
+  };
+
+  // ?file=<relative path> — same-origin only
+  const params = new URLSearchParams(location.search);
+  const fileParam = params.get("file");
+  if (fileParam) {
+    if (/^(https?:)?\/\//i.test(fileParam) || fileParam.startsWith("/")) {
+      showError("Only same-origin relative paths are supported (?file=…).");
+    } else {
+      try {
+        const res = await fetch(fileParam);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        loadPdf(new Uint8Array(await res.arrayBuffer()), fileParam);
+      } catch (err) {
+        showError(`Could not load ${fileParam}: ${err.message}`);
+      }
+    }
+  }
+
+  function showError(msg) {
+    pane.innerHTML = `<div class="empty">⚠️ ${msg}</div>`;
+  }
+
+  async function loadPdf(data, name) {
+    // reset UI
+    pane.innerHTML = "";
+    renderedEl.innerHTML = "";
+    rawEl.textContent = "";
+    badge.textContent = "loading…";
+    badge.className = "badge";
+    agentPane.classList.add("hidden");
+
+    currentDoc = await pdfjsLib.getDocument({ data }).promise;
+    for (let i = 1; i <= currentDoc.numPages; i++) {
+      const page = await currentDoc.getPage(i);
+      const base = page.getViewport({ scale: 1 });
+      const scale = Math.min(1.6, (pane.clientWidth - 32) / base.width);
+      const viewport = page.getViewport({ scale });
+      const canvas = document.createElement("canvas");
+      canvas.width = viewport.width * devicePixelRatio;
+      canvas.height = viewport.height * devicePixelRatio;
+      canvas.style.width = viewport.width + "px";
+      canvas.style.height = viewport.height + "px";
+      pane.appendChild(canvas);
+      await page.render({
+        canvasContext: canvas.getContext("2d"),
+        ...(devicePixelRatio !== 1 ? { transform: [devicePixelRatio, 0, 0, devicePixelRatio, 0, 0] } : {}),
+        viewport,
+      }).promise;
+    }
+
+    await showAgentLayer();
+    document.title = `${name} — Agentic PDF Viewer`;
+  }
+
+  async function showAgentLayer() {
+    const attachments = await currentDoc.getAttachments();
+    const mdEntry =
+      attachments["agent.md"] ??
+      Object.entries(attachments).find(([k]) => k.endsWith(".md"))?.[1];
+
+    if (!mdEntry || !mdEntry.content) {
+      badge.textContent = "no agentic layer";
+      toggleBtn.disabled = true;
+      return;
+    }
+
+    const text = new TextDecoder().decode(mdEntry.content);
+    badge.textContent = "agentic layer ✔";
+    badge.className = "badge ok";
+    toggleBtn.disabled = false;
+    rawEl.textContent = text;
+
+    const m = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/.exec(text);
+    let body = text;
+    if (m) {
+      body = text.slice(m[0].length);
+      const card = document.createElement("div");
+      card.className = "fm";
+      card.textContent = m[1];
+      renderedEl.appendChild(card);
+    }
+    const holder = document.createElement("div");
+    holder.innerHTML = marked.parse(body);
+    renderedEl.appendChild(holder);
+
+    agentPane.classList.remove("hidden");
+    toggleBtn.classList.remove("primary");
+  }
+</script>
+</body>
+</html>

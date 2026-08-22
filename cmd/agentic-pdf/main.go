@@ -1,0 +1,189 @@
+package main
+
+import (
+	"fmt"
+	"os"
+	"strconv"
+
+	"github.com/msanvido/agentic-pdf/internal/cli"
+	"github.com/msanvido/agentic-pdf/internal/viewer"
+)
+
+var version = "0.2.0"
+
+func help() string {
+	return `agentic-pdf v` + version + ` — PDF printer driver + viewer with a hidden agent-readable layer
+
+Usage:
+  agentic-pdf print <input> [-o out.pdf] [--title "T"] [--canonical URL] [--no-html]
+      Convert any printable file to a PDF and embed the hidden agentic layer
+      (agent.md / agent.html attachments). PDFs are used as-is.
+
+  agentic-pdf read <file.pdf> [--raw | --html | --meta]
+      Extract and display the hidden agentic layer.
+        (default)   markdown without frontmatter
+        --raw       raw markdown exactly as embedded (pipe-friendly for agents)
+        --html      rendered HTML
+        --meta      metadata + frontmatter as JSON
+
+  agentic-pdf view <file.pdf> [--port 4173] [--no-browser]
+      Serve the viewer at http://localhost:<port>/?file=doc.pdf
+
+  agentic-pdf check <file.pdf>
+      Exit 0 and print a summary if the file carries an agentic layer.
+
+  agentic-pdf install-backend [--spool DIR]   Install CUPS virtual printer (sudo)
+  agentic-pdf uninstall-backend               Remove the CUPS virtual printer
+`
+}
+
+func main() {
+	args := os.Args[1:]
+	if len(args) == 0 || args[0] == "-h" || args[0] == "--help" || args[0] == "help" {
+		fmt.Print(help())
+		return
+	}
+	if args[0] == "--version" || args[0] == "-v" {
+		fmt.Println(version)
+		return
+	}
+
+	var err error
+	switch args[0] {
+	case "print":
+		err = cmdPrint(args[1:])
+	case "read":
+		err = cmdRead(args[1:])
+	case "view":
+		err = cmdView(args[1:])
+	case "check":
+		err = cmdCheck(args[1:])
+	case "install-backend":
+		err = cli.InstallBackend(flagValue(args, "--spool"))
+	case "uninstall-backend":
+		err = cli.UninstallBackend()
+	default:
+		fmt.Fprintf(os.Stderr, "unknown command: %s\n\n", args[0])
+		fmt.Print(help())
+		os.Exit(1)
+	}
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		os.Exit(1)
+	}
+}
+
+// flags: -o/--out VAL, --title VAL, --canonical VAL, --no-html
+func cmdPrint(args []string) error {
+	input := ""
+	out := ""
+	title := ""
+	canonical := ""
+	noHTML := false
+	for i := 0; i < len(args); i++ {
+		switch args[i] {
+		case "-o", "--out":
+			i++
+			if i >= len(args) {
+				return fmt.Errorf("print: %s needs a value", args[i-1])
+			}
+			out = args[i]
+		case "--title":
+			i++
+			if i >= len(args) {
+				return fmt.Errorf("print: --title needs a value")
+			}
+			title = args[i]
+		case "--canonical":
+			i++
+			if i >= len(args) {
+				return fmt.Errorf("print: --canonical needs a value")
+			}
+			canonical = args[i]
+		case "--no-html":
+			noHTML = true
+		default:
+			input = args[i]
+		}
+	}
+	if input == "" {
+		return fmt.Errorf("print: missing <input>")
+	}
+	return cli.Print(input, out, title, canonical, !noHTML)
+}
+
+func cmdRead(args []string) error {
+	input := ""
+	raw, htmlMode, meta := false, false, false
+	for _, a := range args {
+		switch a {
+		case "--raw":
+			raw = true
+		case "--html":
+			htmlMode = true
+		case "--meta":
+			meta = true
+		default:
+			input = a
+		}
+	}
+	if input == "" {
+		return fmt.Errorf("read: missing <file.pdf>")
+	}
+	return cli.Read(input, raw, htmlMode, meta)
+}
+
+func cmdCheck(args []string) error {
+	input := ""
+	for _, a := range args {
+		if a != "" && a[0] != '-' {
+			input = a
+		}
+	}
+	if input == "" {
+		return fmt.Errorf("check: missing <file.pdf>")
+	}
+	return cli.Check(input)
+}
+
+func cmdView(args []string) error {
+	input := ""
+	port := 4173
+	openBrowser := true
+	for i := 0; i < len(args); i++ {
+		switch args[i] {
+		case "--port":
+			i++
+			if i >= len(args) {
+				return fmt.Errorf("view: --port needs a value")
+			}
+			p, err := strconv.Atoi(args[i])
+			if err != nil {
+				return fmt.Errorf("view: invalid port %q", args[i])
+			}
+			port = p
+		case "--no-browser":
+			openBrowser = false
+		default:
+			input = args[i]
+		}
+	}
+	if input == "" {
+		return fmt.Errorf("view: missing <file.pdf>")
+	}
+	return viewer.Serve(input, port, openBrowser)
+}
+
+func flagValue(args []string, flag string) string {
+	for i := 0; i < len(args)-1; i++ {
+		if args[i] == flag {
+			return args[i+1]
+		}
+	}
+	return ""
+}
+
+func die(msg string) {
+	fmt.Fprintf(os.Stderr, "error: %s\n", msg)
+	os.Exit(1)
+}
