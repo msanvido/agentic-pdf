@@ -43,12 +43,14 @@ make cross            # static builds: darwin/linux/windows × amd64/arm64 → d
 ### Print
 
 Everything (title, summary, timestamps, canonical source) is extracted
-automatically from the raw data:
+automatically from the raw data. Sample inputs live in [`docs/demo/`](docs/demo/):
 
 ```bash
-agentic-pdf print report.txt -o report.pdf        # any cupsfilter-convertible input
-agentic-pdf print scan.pdf --title "Q3 Report"    # PDFs pass through + layer added
-agentic-pdf check report.pdf                      # verify the layer (exit 0 = present)
+agentic-pdf print docs/demo/report.txt -o report.pdf    # rich 2-page business report
+agentic-pdf print docs/demo/memo.txt -o memo.pdf        # internal memo
+agentic-pdf print docs/demo/fed-monetary-policy-report-july-2026.pdf   # real 77-page Fed report (charts)
+agentic-pdf print docs/demo/sample.txt --title "Q3 Report" --canonical https://example.com/q3
+agentic-pdf check report.pdf                       # verify the layer (exit 0 = present)
 ```
 
 ### Read the agent layer
@@ -102,8 +104,19 @@ internal/cli/         commands: print/read/check/watch/installers/notifications
 internal/viewer/      viewer server; embeds viewer.html + demo PDFs
 docs/                 GitHub Pages site: spec guide + hosted viewer (generated:
                       make sync-viewer)
-demo/                 sample input file
+docs/demo/            sample inputs (see below)
 ```
+
+**Demo files** — every example in this README uses a file that ships in the repo:
+
+| File | What it exercises |
+| --- | --- |
+| `docs/demo/sample.txt` | Minimal plain-text report |
+| `docs/demo/report.txt` | Rich structure: numbered sections, lists, metrics, risk factors (prints to 2 pages) |
+| `docs/demo/memo.txt` | Business memo with headers, mixed formatting |
+| `docs/demo/fed-monetary-policy-report-july-2026.pdf` | Real-world stress test: 77-page Federal Reserve Monetary Policy Report full of charts and graphs (public domain). The charts stay in the visual layer; the agent layer carries the extracted narrative text |
+
+Pre-generated agentic versions of these live in `docs/demo/` for the hosted viewer.
 
 ## For agent authors
 

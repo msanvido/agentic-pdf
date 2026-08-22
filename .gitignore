@@ -1,5 +1,4 @@
 bin/
 dist/
-demo/*.agent.pdf
-demo/multipage.pdf
+*.agentic.pdf
 .DS_Store

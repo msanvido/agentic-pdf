@@ -1,0 +1,80 @@
+ACME INDUSTRIES PLC
+QUARTERLY BUSINESS REPORT — Q2 FY2026
+Prepared by the Office of the CFO · August 2026
+
+1. EXECUTIVE SUMMARY
+
+Revenue reached $18.4M in Q2 FY2026, an increase of 12.3% year over year.
+Gross margin expanded to 61.7% on favorable input costs and the continued
+mix shift toward subscription revenue, which now represents 43% of total
+bookings. Operating expenses grew more slowly than revenue for the fourth
+consecutive quarter, producing positive operating leverage of 310 basis
+points.
+
+Free cash flow was $3.1M, driven by disciplined working capital management;
+days sales outstanding fell from 54 to 47. The board-approved share
+repurchase program returned $1.5M to shareholders during the quarter.
+
+2. SEGMENT PERFORMANCE
+
+2.1 Platform Division
+
+The Platform Division generated $11.2M of revenue, up 15% YoY. Annual
+recurring revenue ended the quarter at $44.8M with net revenue retention of
+117%. Key wins included three enterprise seven-figure renewals and the
+launch of the usage-based pricing tier in May.
+
+2.2 Professional Services
+
+Services revenue was $5.1M, roughly flat YoY as planned. Utilization averaged
+78% against a target of 75%. Backlog stands at $6.3M, covering 89% of next
+quarter's services plan.
+
+2.3 Hardware
+
+Hardware revenue declined 9% YoY to $2.1M, consistent with the strategic
+de-emphasis announced last year. Inventory write-downs of $180K were taken
+against discontinued SKUs.
+
+3. KEY METRICS
+
+- Revenue: $18.4M (+12.3% YoY)
+- Gross margin: 61.7% (+240 bps YoY)
+- Operating margin: 14.2%
+- Free cash flow: $3.1M
+- Net revenue retention: 117%
+- Customers > $100K ARR: 87 (+14 QoQ)
+- Employee count: 412 (+3% QoQ)
+
+4. RISK FACTORS
+
+Management continues to monitor several risks:
+
+a) FX exposure in EMEA, where 18% of revenue is denominated in euros and
+   sterling; hedging coverage is currently at 60% of forecast exposure.
+
+b) Concentration risk: the top ten customers represent 31% of ARR, down
+   from 34% a year ago but still above our 25% comfort threshold.
+
+c) Talent competition for senior platform engineers in the Austin market,
+   where voluntary attrition rose to 14% annualized.
+
+d) Pending EU AI Act compliance workstream, expected to consume roughly
+   800 engineering hours across H2 FY2026.
+
+5. OUTLOOK
+
+For Q3 FY2026 we guide to revenue of $19.1M to $19.6M and non-GAAP operating
+margin of 14.5% to 15%. Full-year guidance is raised modestly: revenue of
+$74.5M to $75.5M and free cash flow conversion above 40% of adjusted net
+income. Assumptions include no material change to FX rates, continued
+subscription mix improvement of roughly one point per quarter, and the
+on-time delivery of the Agentic Gateway v2 release scheduled for October.
+
+Appendix A — Reconciliation
+
+Non-GAAP adjustments this quarter comprised stock-based compensation of
+$2.2M, amortization of acquired intangibles of $0.4M, and restructuring
+charges of $0.3M related to the hardware wind-down. A full reconciliation
+to GAAP measures appears in the condensed consolidated statements filed
+with this report.

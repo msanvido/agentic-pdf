@@ -125,7 +125,10 @@
   <p class="muted">Produce a conforming document with:</p>
   <pre><code><span class="c"># print any convertible file into an agentic PDF — everything is
 # extracted automatically from the raw data; no flags needed:</span>
-agentic-pdf print quarterly-report.txt -o report.pdf
+agentic-pdf print docs/demo/report.txt -o report.pdf
+
+<span class="c"># real-world stress test: a 77-page Federal Reserve report full of charts</span>
+agentic-pdf print demo/fed-monetary-policy-report-july-2026.pdf
 
 <span class="c"># verify the layer</span>
 agentic-pdf check report.pdf
@@ -270,12 +273,13 @@ agentic-pdf read report.pdf --raw | llm "summarize this"</code></pre>
 git clone https://github.com/msanvido/agentic-pdf &amp;&amp; cd agentic-pdf
 make build            <span class="c"># → bin/agentic-pdf (also: make cross for all platforms)</span>
 
-<span class="c"># print anything printable into an agentic PDF</span>
-agentic-pdf print memo.txt -o memo.pdf
-agentic-pdf print scan.pdf --title "Q3 Report" --canonical https://example.com/q3
-
 <span class="c"># local viewer at http://localhost:4173/?file=doc.pdf</span>
 agentic-pdf view memo.pdf</code></pre>
+  <p class="muted">
+    All examples use files that ship in the repository under <code>docs/demo/</code> —
+    including a real, chart-heavy 77-page Federal Reserve Monetary Policy
+    Report (public domain) as a stress test.
+  </p>
 
   <h3>Automatic printing</h3>
   <p>

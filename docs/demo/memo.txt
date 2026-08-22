@@ -1,0 +1,41 @@
+INTERNAL MEMORANDUM
+
+TO:       All Engineering Staff
+FROM:     Dana Whitfield, VP Platform Engineering
+DATE:     August 14, 2026
+SUBJECT:  On-call rotation changes effective September 1
+PRIORITY: High — action required before August 28
+
+SUMMARY
+
+Starting September 1 we are moving from a per-team on-call model to a
+follow-the-sun rotation across the Austin, Dublin, and Singapore sites.
+This memo explains what changes, what stays the same, and the three actions
+each engineer must complete before August 28.
+
+WHAT CHANGES
+
+- Primary paging follows the sun: Austin covers 14:00–22:00 UTC, Dublin
+  covers 07:00–15:00 UTC, and Singapore covers 23:00–07:00 UTC.
+- Escalation paths are consolidated into a single PagerDuty policy named
+  platform-tier-1. The legacy team-level policies will be retired on
+  September 15.
+- Compensation: on-call shifts carry a 4% differential, paid monthly.
+
+WHAT DOES NOT CHANGE
+
+Severity definitions, the incident command handbook, and postmortem SLAs
+(postmortems due within five business days for SEV-1/SEV-2) remain exactly
+as documented in the engineering handbook, section 7.
+
+REQUIRED ACTIONS BY AUGUST 28
+
+1. Confirm your home site and timezone in Workday.
+2. Complete the updated incident command training (45 minutes) in LMS.
+3. Acknowledge the new rotation calendar in PagerDuty.
+
+QUESTIONS
+
+Bring questions to Thursday's platform all-hands, or ping
+#on-call-transition. Exceptions (e.g., medical restrictions) go directly
+to your manager and to Dana.
