@@ -217,8 +217,3 @@ func flagValue(args []string, flag string) string {
 	}
 	return ""
 }
-
-func die(msg string) {
-	fmt.Fprintf(os.Stderr, "error: %s\n", msg)
-	os.Exit(1)
-}

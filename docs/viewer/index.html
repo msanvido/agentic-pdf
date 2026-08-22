@@ -67,8 +67,8 @@
       Everything is parsed locally in your browser; nothing is uploaded.
       <div class="samples">
         <span>Try a sample:</span>
-        <button data-file="../demo/sample.agent.pdf">Quarterly report</button>
-        <button data-file="../demo/multipage.agent.pdf">Multi-page doc</button>
+        <button data-file="demo/sample.agent.pdf">Quarterly report</button>
+        <button data-file="demo/multipage.agent.pdf">Multi-page doc</button>
       </div>
       <div style="margin-top:14px;color:var(--muted)">…or append <code>?file=</code> + a relative PDF URL, or open a file from disk.</div>
     </div>
@@ -100,8 +100,10 @@
   let currentDoc = null;
 
   // Sample quick-load buttons
+  // Site root: "/agentic-pdf/" on GitHub Pages, "/" on the local viewer.
+  const ROOT = location.pathname.replace(/\/viewer\/[^/]*$/, "/");
   document.querySelectorAll(".samples button[data-file]").forEach(b => {
-    b.onclick = () => loadFromUrl(b.dataset.file);
+    b.onclick = () => loadFromUrl(ROOT + b.dataset.file);
   });
 
   async function loadFromUrl(url) {

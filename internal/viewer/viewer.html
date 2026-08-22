@@ -42,13 +42,19 @@
   #agent-content blockquote { border-left:3px solid var(--accent); margin-left:0; padding-left:12px; color:var(--muted); }
   #agent-raw { margin:0; font-family:"SF Mono",Menlo,monospace; font-size:12px; white-space:pre-wrap; word-break:break-word; color:#c8e1ff; }
   .fm { background:#20202a; border:1px solid #30303a; border-radius:8px; padding:10px 12px; margin-bottom:16px; font-family:monospace; font-size:11px; color:var(--muted); white-space:pre-wrap; }
+  .crumb { color:var(--muted); font-weight:400; font-size:13px; }
+  .samples { margin-top:22px; display:flex; gap:10px; align-items:center; justify-content:center; flex-wrap:wrap; }
+  .samples span { color:var(--muted); font-size:13px; }
+  .samples button { background:var(--accent); color:#fff; border:none; padding:8px 14px; border-radius:8px; cursor:pointer; font-size:13px; font-weight:600; }
+  .samples button:hover { filter:brightness(1.1); }
 </style>
 </head>
 <body>
 <header>
-  <h1><a href="https://github.com/msanvido/agentic-pdf">Agentic PDF Viewer</a></h1>
+  <h1><a href="../">agentic<span style="color:var(--accent)">-pdf</span></a> <span class="crumb">/ viewer</span></h1>
   <span class="badge" id="layer-badge">no file loaded</span>
   <span class="spacer"></span>
+  <a class="btn" href="https://github.com/msanvido/agentic-pdf" target="_blank" rel="noopener">GitHub ↗</a>
   <label class="btn" for="file-input">Open local PDF…</label>
   <input type="file" id="file-input" accept="application/pdf,.pdf">
   <button class="btn primary" id="toggle-agent" disabled>Agent layer</button>
@@ -56,9 +62,15 @@
 <main>
   <div id="pdf-pane">
     <div class="empty" id="empty-state">
-      Load an <strong>agentic PDF</strong> to inspect it.<br>
-      Append <code>?file=demo/sample.agent.pdf</code> to the URL,<br>
-      or open a file from disk — everything stays in your browser.
+      Load an <strong>agentic PDF</strong> to inspect it — the visual pages on
+      the left, its hidden agent-readable layer on the right.<br>
+      Everything is parsed locally in your browser; nothing is uploaded.
+      <div class="samples">
+        <span>Try a sample:</span>
+        <button data-file="demo/sample.agent.pdf">Quarterly report</button>
+        <button data-file="demo/multipage.agent.pdf">Multi-page doc</button>
+      </div>
+      <div style="margin-top:14px;color:var(--muted)">…or append <code>?file=</code> + a relative PDF URL, or open a file from disk.</div>
     </div>
   </div>
   <aside id="agent-pane" class="hidden">
@@ -86,6 +98,23 @@
   const tabR = document.getElementById("tab-rendered");
   const tabW = document.getElementById("tab-raw");
   let currentDoc = null;
+
+  // Sample quick-load buttons
+  // Site root: "/agentic-pdf/" on GitHub Pages, "/" on the local viewer.
+  const ROOT = location.pathname.replace(/\/viewer\/[^/]*$/, "/");
+  document.querySelectorAll(".samples button[data-file]").forEach(b => {
+    b.onclick = () => loadFromUrl(ROOT + b.dataset.file);
+  });
+
+  async function loadFromUrl(url) {
+    try {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      loadPdf(new Uint8Array(await res.arrayBuffer()), url);
+    } catch (err) {
+      pane.innerHTML = `<div class="empty">⚠️ Could not load ${url}: ${err.message}</div>`;
+    }
+  }
 
   tabR.onclick = () => switchTab(true);
   tabW.onclick = () => switchTab(false);

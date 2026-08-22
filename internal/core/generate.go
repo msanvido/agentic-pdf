@@ -1,12 +1,10 @@
 package core
 
 import (
-	"os"
+	"sort"
 	"strings"
+	"time"
 )
-
-func osReadFile(p string) ([]byte, error)  { return os.ReadFile(p) }
-func osStat(p string) (os.FileInfo, error) { return os.Stat(p) }
 
 // BuildGlossary extracts likely acronyms / recurring capitalized terms.
 func BuildGlossary(pages []PageText) string {
@@ -39,14 +37,7 @@ func BuildGlossary(pages []PageText) string {
 	if len(top) == 0 {
 		return "_No recurring terminology detected._"
 	}
-	// stable-ish ordering by count desc
-	for i := 0; i < len(top); i++ {
-		for j := i + 1; j < len(top); j++ {
-			if top[j].n > top[i].n {
-				top[i], top[j] = top[j], top[i]
-			}
-		}
-	}
+	sort.Slice(top, func(i, j int) bool { return top[i].n > top[j].n })
 	if len(top) > 12 {
 		top = top[:12]
 	}
@@ -57,13 +48,7 @@ func BuildGlossary(pages []PageText) string {
 	return strings.Join(parts, "\n")
 }
 
-var (
-	termRE     = regexpMustCompile(`\b[A-Z][A-Za-z0-9]*(-[A-Za-z0-9]+)*\b`)
-	allUpperRE = regexpMustCompile(`^[A-Z]{2,}$`)
-)
-
 // MarkdownToHTML renders a small, dependency-free subset of markdown to HTML
-// (headings, lists, paragraphs, inline emphasis/code/links, blockquotes).
 func MarkdownToHTML(md string) string {
 	var out []string
 	inList := false
@@ -121,7 +106,7 @@ func renderInline(s string) string {
 
 // BuildAgentMarkdown assembles the full agent.md content per the spec:
 // frontmatter, agent note, summary, TOC, content, sitemap and glossary.
-func BuildAgentMarkdown(pages []PageText, title, description, canonical, docVersion string, now Now) (markdown string, fm Frontmatter) {
+func BuildAgentMarkdown(pages []PageText, title, description, canonical, docVersion string) (markdown string, fm Frontmatter) {
 	if title == "" {
 		title = GuessTitle(pages)
 	}
@@ -139,7 +124,7 @@ func BuildAgentMarkdown(pages []PageText, title, description, canonical, docVers
 		Title:       title,
 		Description: description,
 		DocVersion:  docVersion,
-		LastUpdated: now.Time.UTC().Format("2006-01-02T15:04:05Z"),
+		LastUpdated: time.Now().UTC().Format("2006-01-02T15:04:05Z"),
 		Canonical:   canonical,
 		Generator:   "agentic-pdf/" + SpecVersion,
 		SourcePages: len(pages),

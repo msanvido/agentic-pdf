@@ -45,7 +45,6 @@ func Watch(spoolDir, outDir string, deleteOriginal bool) error {
 
 	fmt.Printf("👀 watching %s\n   output: %s\n   Ctrl-C to stop\n", spoolAbs, outAbs)
 
-	pending := map[string]chan struct{}{}
 	process := func(name string) {
 		path := filepath.Join(spoolAbs, name)
 		info, err := os.Stat(path)
@@ -93,7 +92,6 @@ func Watch(spoolDir, outDir string, deleteOriginal bool) error {
 					delete(timers, name)
 				}
 			}
-			_ = pending
 		case err, ok := <-watcher.Errors:
 			if !ok {
 				return nil

@@ -16,8 +16,7 @@ import (
 // agent.md + agent.html attachments, Title/Subject metadata, and the
 // AgentReadability / CanonicalSource custom Info keys.
 func InjectAgentLayer(pdfBytes []byte, pages []PageText, title, description, canonical, docVersion string, withHTML bool) ([]byte, error) {
-	now := NowUTC()
-	markdown, fm := BuildAgentMarkdown(pages, title, description, canonical, docVersion, Now{now})
+	markdown, fm := BuildAgentMarkdown(pages, title, description, canonical, docVersion)
 
 	dir, err := os.MkdirTemp("", "agentic-pdf-")
 	if err != nil {
@@ -60,8 +59,7 @@ func InjectAgentLayer(pdfBytes []byte, pages []PageText, title, description, can
 
 	// Pass 2: keywords.
 	var outK bytes.Buffer
-	if err := api.AddKeywords(bytes.NewReader(out.Bytes()), &outK,
-		[]string{"agent-readable", "agentic-pdf", "llm-readable"}, conf); err != nil {
+	if err := api.AddKeywords(bytes.NewReader(out.Bytes()), &outK, MarkerKeywords, conf); err != nil {
 		return nil, fmt.Errorf("setting keywords: %w", err)
 	}
 

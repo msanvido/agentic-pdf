@@ -20,10 +20,11 @@ cross:
 			-o dist/$(BINARY)-$$os-$$arch$(if $(filter windows,$$os),.exe,) ./cmd/agentic-pdf; \
 	done
 
-# The local viewer and the GitHub Pages viewer share the same HTML.
-# (The Pages site lives in docs/: index = spec guide, viewer/ = viewer.)
+# The local viewer binary embeds internal/viewer/viewer.html + demo PDFs.
+# sync-viewer publishes the same files into docs/ for GitHub Pages.
 sync-viewer:
 	cp internal/viewer/viewer.html docs/viewer/index.html
+	cp internal/viewer/demo/*.agent.pdf docs/demo/
 
 clean:
 	rm -rf bin dist

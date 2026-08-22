@@ -1,7 +1,7 @@
 package viewer
 
 import (
-	_ "embed"
+	"embed"
 	"fmt"
 	"net/http"
 	"os"
@@ -9,12 +9,16 @@ import (
 	"os/signal"
 	"path/filepath"
 	"runtime"
+	"strings"
 
 	"github.com/msanvido/agentic-pdf/internal/core"
 )
 
 //go:embed viewer.html
 var indexHTML []byte
+
+//go:embed demo/*.agent.pdf
+var demoFiles embed.FS
 
 // Serve hosts a local viewer for the given PDF.
 // The UI is fully client-side: pdf.js renders the pages and extracts the
@@ -42,6 +46,20 @@ func Serve(pdfPath string, port int, openBrowser bool) error {
 		w.Header().Set("Content-Type", "application/pdf")
 		w.Header().Set("Link", `</doc.pdf>; rel="canonical"`)
 		_, _ = w.Write(data)
+	})
+	mux.HandleFunc("/demo/", func(w http.ResponseWriter, r *http.Request) {
+		name := strings.TrimPrefix(r.URL.Path, "/demo/")
+		if name != filepath.Base(name) || !strings.HasSuffix(name, ".pdf") {
+			http.NotFound(w, r)
+			return
+		}
+		pdf, err := demoFiles.ReadFile("demo/" + name)
+		if err != nil {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", "application/pdf")
+		_, _ = w.Write(pdf)
 	})
 
 	addr := fmt.Sprintf("http://localhost:%d/", port)

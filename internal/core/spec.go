@@ -3,7 +3,6 @@ package core
 import (
 	"fmt"
 	"strings"
-	"time"
 )
 
 const (
@@ -12,11 +11,14 @@ const (
 	AgentHTML   = "agent.html"
 	LLMSTxt     = "llms.txt"
 
-	InfoKey       = "AgentReadability"
-	InfoValue     = "agentic-pdf-spec/" + SpecVersion
-	CanonicalKey  = "CanonicalSource"
-	MarkerKeyword = "agent-readable agentic-pdf llm-readable"
+	InfoKey      = "AgentReadability"
+	InfoValue    = "agentic-pdf-spec/" + SpecVersion
+	CanonicalKey = "CanonicalSource"
 )
+
+// MarkerKeywords are written to the PDF Keywords field so corpus-wide
+// indexing can discover agentic files.
+var MarkerKeywords = []string{"agent-readable", "agentic-pdf", "llm-readable"}
 
 type Frontmatter struct {
 	Title       string
@@ -70,5 +72,3 @@ func ParseFrontmatter(md string) (map[string]string, string) {
 	body = strings.TrimPrefix(body, "\n")
 	return fm, body
 }
-
-func NowUTC() time.Time { return time.Now().UTC() }

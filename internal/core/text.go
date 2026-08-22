@@ -3,6 +3,7 @@ package core
 import (
 	"bytes"
 	"fmt"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
@@ -186,7 +187,7 @@ func GuessTitle(pages []PageText) string {
 // ToPdf converts arbitrary printable input to PDF bytes. Already-PDF input is
 // passed through; anything else goes through the platform's cups filter chain.
 func ToPdf(inputPath string) ([]byte, error) {
-	data, err := osReadFile(inputPath)
+	data, err := os.ReadFile(inputPath)
 	if err != nil {
 		return nil, err
 	}
@@ -202,7 +203,7 @@ func cupsFilterToPDF(inputPath string) ([]byte, error) {
 	var cmd *exec.Cmd
 	for _, c := range candidates {
 		if filepath.IsAbs(c) {
-			if _, err := osStat(c); err == nil {
+			if _, err := os.Stat(c); err == nil {
 				cmd = exec.Command(c, "-o", "media=A4", "-o", "fit-to-page", inputPath)
 				break
 			}
