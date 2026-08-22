@@ -109,14 +109,35 @@ rendered or raw — on the right. The server also exposes:
 - `GET /doc.pdf` — the original visual PDF
 - `GET /` with `Accept: text/markdown` — content-negotiated markdown
 
-### System print driver (CUPS, macOS)
+### System print drivers
 
-Installs a virtual printer that appears in every macOS Print dialog:
+**macOS — CUPS virtual printer** (primary route):
 
 ```bash
 sudo agentic-pdf install-backend            # installs the CUPS virtual printer
 # print from any app → "Agentic PDF Printer" → PDF lands in ~/Documents/Agentic-PDF
 sudo agentic-pdf uninstall-backend          # remove it
+```
+
+**Windows — spool-folder watcher** (no driver signing required):
+Windows does not allow unsigned third-party print drivers, so the watcher uses
+the built-in *Microsoft Print to PDF* writer instead:
+
+```powershell
+agentic-pdf install-watch        # run once; creates an auto-start scheduled task
+```
+
+From then on: print from any app → **Microsoft Print to PDF** → save into
+`Documents\Agentic-Spool` → the watcher converts it automatically and an
+agentic PDF appears in `Documents\Agentic-PDF` with a toast notification.
+Nothing is uploaded; everything happens locally.
+
+**macOS / Linux watcher** (optional, complements the CUPS backend — also picks up AirPrint or other tools' drops):
+
+```bash
+agentic-pdf install-watch       # LaunchAgent (macOS) or systemd user unit (Linux)
+agentic-pdf watch <dir>         # …or run it manually on any folder
+agentic-pdf uninstall-watch     # remove it
 ```
 
 ### Verify

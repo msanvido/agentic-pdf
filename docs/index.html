@@ -123,7 +123,8 @@
 <section id="checklist">
   <h2>Quick-start checklist</h2>
   <p class="muted">Produce a conforming document with:</p>
-  <pre><code><span class="c"># print any convertible file into an agentic PDF</span>
+  <pre><code><span class="c"># print any convertible file into an agentic PDF — everything is
+# extracted automatically from the raw data; no flags needed:</span>
 agentic-pdf print quarterly-report.txt -o report.pdf
 
 <span class="c"># verify the layer</span>
@@ -266,18 +267,45 @@ agentic-pdf read report.pdf --raw | llm "summarize this"</code></pre>
     The reference implementation is a single Go binary (~11 MB) with no runtime dependencies:
   </p>
   <pre><code><span class="c"># install</span>
-git clone https://github.com/msanvido/agentic-pdf && cd agentic-pdf
+git clone https://github.com/msanvido/agentic-pdf &amp;&amp; cd agentic-pdf
 make build            <span class="c"># → bin/agentic-pdf (also: make cross for all platforms)</span>
 
 <span class="c"># print anything printable into an agentic PDF</span>
 agentic-pdf print memo.txt -o memo.pdf
 agentic-pdf print scan.pdf --title "Q3 Report" --canonical https://example.com/q3
 
-<span class="c"># macOS system printer — appears in every Print dialog</span>
-sudo agentic-pdf install-backend
-
 <span class="c"># local viewer at http://localhost:4173/?file=doc.pdf</span>
 agentic-pdf view memo.pdf</code></pre>
+
+  <h3>Automatic printing</h3>
+  <p>
+    No manual step is needed at print time — the driver extracts everything
+    (title, summary, timestamps, canonical source) from the raw document data.
+  </p>
+  <table>
+    <tr><th>Platform</th><th>Setup</th><th>Workflow</th></tr>
+    <tr>
+      <td><strong>macOS</strong></td>
+      <td><code>sudo agentic-pdf install-backend</code></td>
+      <td>Any app → Print → <em>Agentic PDF Printer</em> → agentic PDF lands in <code>~/Documents/Agentic-PDF</code></td>
+    </tr>
+    <tr>
+      <td><strong>Windows</strong></td>
+      <td><code>agentic-pdf install-watch</code> (once)</td>
+      <td>Any app → <em>Microsoft Print to PDF</em> → save into <code>Documents\Agentic-Spool</code> → agentic PDF appears in <code>Documents\Agentic-PDF</code> with a toast notification</td>
+    </tr>
+    <tr>
+      <td><strong>Linux</strong></td>
+      <td><code>agentic-pdf install-watch</code></td>
+      <td>Drop any PDF into the spool folder; a systemd user service converts it automatically</td>
+    </tr>
+  </table>
+  <p class="muted">
+    Windows does not permit unsigned third-party print drivers, so the watcher
+    pairs with the built-in <em>Microsoft Print to PDF</em> writer — same
+    one-print-step experience, zero driver signing. The watcher also skips
+    files that already carry an agent layer, so round-trips are safe.
+  </p>
   <p class="muted">
     Non-PDF input is converted through the platform's CUPS filter chain;
     PDF input passes through untouched except for the added layer.

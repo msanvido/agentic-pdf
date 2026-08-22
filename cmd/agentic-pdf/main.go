@@ -34,6 +34,15 @@ Usage:
 
   agentic-pdf install-backend [--spool DIR]   Install CUPS virtual printer (sudo)
   agentic-pdf uninstall-backend               Remove the CUPS virtual printer
+
+  agentic-pdf watch <spool-dir> [--out DIR]
+      Convert every PDF dropped into <spool-dir> into an agentic PDF
+      (this is the engine behind the Windows print driver setup).
+
+  agentic-pdf install-watch [--spool DIR] [--out DIR]
+      Install the watcher as an auto-start service:
+      Windows scheduled task / macOS LaunchAgent / Linux systemd unit.
+  agentic-pdf uninstall-watch                 Remove the watcher service.
 `
 }
 
@@ -62,6 +71,12 @@ func main() {
 		err = cli.InstallBackend(flagValue(args, "--spool"))
 	case "uninstall-backend":
 		err = cli.UninstallBackend()
+	case "watch":
+		err = cmdWatch(args[1:])
+	case "install-watch":
+		err = cli.InstallWatch(flagValue(args, "--spool"), flagValue(args, "--out"))
+	case "uninstall-watch":
+		err = cli.UninstallWatch()
 	default:
 		fmt.Fprintf(os.Stderr, "unknown command: %s\n\n", args[0])
 		fmt.Print(help())
@@ -172,6 +187,26 @@ func cmdView(args []string) error {
 		return fmt.Errorf("view: missing <file.pdf>")
 	}
 	return viewer.Serve(input, port, openBrowser)
+}
+
+func cmdWatch(args []string) error {
+	spool := ""
+	out := ""
+	for i := 0; i < len(args); i++ {
+		switch args[i] {
+		case "--out":
+			i++
+			if i >= len(args) {
+				return fmt.Errorf("watch: --out needs a value")
+			}
+			out = args[i]
+		default:
+			if spool == "" {
+				spool = args[i]
+			}
+		}
+	}
+	return cli.Watch(spool, out, false)
 }
 
 func flagValue(args []string, flag string) string {
