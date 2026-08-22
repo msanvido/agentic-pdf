@@ -1,0 +1,5 @@
+node_modules/
+dist/
+demo/*.agent.pdf
+demo/multipage.pdf
+.DS_Store

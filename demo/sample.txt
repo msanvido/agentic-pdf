@@ -1,0 +1,34 @@
+ACME QUARTERLY REPORT — Q3 2026
+===============================
+
+EXECUTIVE SUMMARY
+
+Revenue for Q3 2026 reached $4.2M, up 18% quarter over quarter. The API
+platform now serves 12,000 daily active developers. Churn fell to 2.1%
+following the launch of the retention program in July.
+
+KEY METRICS
+
+- Revenue: $4.2M (+18% QoQ)
+- Daily active developers: 12,000 (+31%)
+- Net revenue retention: 118%
+- Gross margin: 79%
+
+PRODUCT HIGHLIGHTS
+
+The Agentic Gateway shipped to general availability in August. Early
+adoption exceeded forecasts; 340 enterprise accounts enabled the feature
+within the first three weeks. Latency at p99 improved from 420ms to 180ms
+after the edge caching rollout.
+
+RISKS AND CONCERNS
+
+Hiring for the platform team remains behind plan. Two senior SRE roles
+have been open since May. Regulatory review of the EU data residency
+program is expected to conclude in November.
+
+OUTLOOK
+
+We forecast $4.8M revenue in Q4 driven by seasonal enterprise renewals and
+continued adoption of the usage-based pricing model introduced this
+quarter.

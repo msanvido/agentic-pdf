@@ -1,0 +1,30 @@
+{
+  "name": "agentic-pdf",
+  "version": "0.1.0",
+  "description": "PDF printer driver + viewer that embeds a hidden, agent-readable layer (markdown) in PDFs, per the Vercel agent-readability spec.",
+  "type": "module",
+  "bin": {
+    "agentic-pdf": "dist/cli/index.js"
+  },
+  "scripts": {
+    "build": "tsc && cp src/viewer/viewer.html dist/viewer/viewer.html",
+    "dev": "tsx src/cli/index.ts",
+    "demo": "npm run build && node dist/cli/index.js print demo/sample.txt -o demo/sample.agent.pdf && node dist/cli/index.js read demo/sample.agent.pdf"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "marked": "^15.0.0",
+    "pdf-lib": "^1.17.1",
+    "pdfjs-dist": "^4.10.38"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true
+  }
+}
