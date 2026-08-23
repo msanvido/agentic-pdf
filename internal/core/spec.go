@@ -2,6 +2,9 @@ package core
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
+	"runtime"
 	"strings"
 )
 
@@ -71,4 +74,20 @@ func ParseFrontmatter(md string) (map[string]string, string) {
 	body := s[end+4:]
 	body = strings.TrimPrefix(body, "\n")
 	return fm, body
+}
+
+// DefaultSpoolDir is the TCC-safe folder where print jobs are dropped.
+func DefaultSpoolDir() string {
+	if runtime.GOOS == "darwin" {
+		return "/Users/Shared/Agentic-Spool"
+	}
+	return filepath.Join(os.TempDir(), "agentic-spool")
+}
+
+// DefaultOutDir is the TCC-safe folder where finished agentic PDFs land.
+func DefaultOutDir() string {
+	if runtime.GOOS == "darwin" {
+		return "/Users/Shared/Agentic-PDF"
+	}
+	return filepath.Join(os.TempDir(), "agentic-pdf")
 }

@@ -6,6 +6,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+
+	"github.com/msanvido/agentic-pdf/internal/core"
 )
 
 // InstallWatch sets up an auto-start entry so the spool-folder watcher runs
@@ -13,19 +15,15 @@ import (
 //   - Windows: scheduled task ("Microsoft Print to PDF" into the spool folder)
 //   - macOS:   launchd agent (complements the CUPS backend)
 func InstallWatch(spool, outDir string) error {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return err
-	}
 	exe, err := os.Executable()
 	if err != nil {
 		return fmt.Errorf("resolving executable path: %w", err)
 	}
 	if spool == "" {
-		spool = filepath.Join(home, "Documents", "Agentic-Spool")
+		spool = core.DefaultSpoolDir()
 	}
 	if outDir == "" {
-		outDir = filepath.Join(home, "Documents", "Agentic-PDF")
+		outDir = core.DefaultOutDir()
 	}
 	for _, d := range []string{spool, outDir} {
 		if err := os.MkdirAll(d, 0o755); err != nil {

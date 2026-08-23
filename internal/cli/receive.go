@@ -21,8 +21,7 @@ import (
 //	POST /print   body: PDF bytes   header: X-Job-Id, X-Job-Title
 func Receive(port int, outDir string) error {
 	if outDir == "" {
-		home, _ := os.UserHomeDir()
-		outDir = filepath.Join(home, "Documents", "Agentic-PDF")
+		outDir = core.DefaultOutDir()
 	}
 	if err := os.MkdirAll(outDir, 0o755); err != nil {
 		return err

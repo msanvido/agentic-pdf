@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+
+	"github.com/msanvido/agentic-pdf/internal/core"
 )
 
 //go:embed agentic.ppd
@@ -37,8 +39,7 @@ func toJSON(v any) string {
 // Everything after the sandbox boundary runs as the logged-in user.
 func InstallBackend(spool string) error {
 	if spool == "" {
-		home, _ := os.UserHomeDir()
-		spool = filepath.Join(home, "Documents", "Agentic-PDF")
+		spool = core.DefaultOutDir()
 	}
 	if err := os.MkdirAll(spool, 0o755); err != nil {
 		return err
