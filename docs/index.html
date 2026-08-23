@@ -15,7 +15,7 @@
   <nav>
     <a href="#how">How it works</a>
     <a href="#checklist">Checklist</a>
-    <a href="#reference">Spec</a>
+    <a href="https://github.com/msanvido/agentic-pdf/blob/main/SPEC.md">Spec</a>
     <a href="#tooling">Tooling</a>
     <a class="cta" href="viewer/">Open viewer →</a>
   </nav>
@@ -24,7 +24,7 @@
 <div class="wrap">
 
 <section class="hero" id="top">
-  <span class="kicker">Specification · v1.0</span>
+  <span class="kicker">Specification · v1.1</span>
   <h1>Agent readability,<br>for <em>PDF documents</em>.</h1>
   <p class="lead">
     PDFs carry most of the world's important information — reports, invoices,
@@ -36,7 +36,7 @@
   <div class="actions">
     <a class="btn primary" href="viewer/">Try the viewer</a>
     <a class="btn" href="https://github.com/msanvido/agentic-pdf">GitHub ↗</a>
-    <a class="btn" href="#reference">Read the spec</a>
+    <a class="btn" href="https://github.com/msanvido/agentic-pdf/blob/main/SPEC.md">Read the spec</a>
   </div>
 </section>
 
@@ -217,7 +217,7 @@ agentic-pdf read report.pdf --raw | llm "summarize this"</code></pre>
     <li>Frontmatter includes <code>title</code>, <code>description</code> (50+ chars), <code>doc_version</code>, <code>last_updated</code>, <code>generator</code></li>
     <li>Body contains <code># Title</code>, <code>## Summary</code>, <code>## Content</code>, <code>## Sitemap</code>, <code>## Glossary</code> sections</li>
     <li>Tabular content mirrored as markdown tables in <code>## Tables</code>; figure/chart captions listed in <code>## Figures</code> with page references (when the source contains them)</li>
-    <li>Info dictionary sets <code>AgentReadability</code> = <code>agentic-pdf-spec/1.0</code></li>
+    <li>Info dictionary sets <code>AgentReadability</code> = <code>agentic-pdf-spec/1.1</code></li>
     <li>Canonical source recorded via frontmatter <code>canonical</code> and Info key <code>CanonicalSource</code></li>
     <li>Visual pages byte-for-byte equivalent in appearance to a non-agentic print</li>
     <li>(Recommended) <code>agent.html</code> mirror attached with meta description + og tags</li>
@@ -242,7 +242,7 @@ agentic-pdf read report.pdf --raw | llm "summarize this"</code></pre>
   <h3>Info dictionary keys</h3>
   <table>
     <tr><th>Key</th><th>Value</th><th>Purpose</th></tr>
-    <tr><td><code>AgentReadability</code></td><td><code>agentic-pdf-spec/1.0</code></td><td>Marks conformance and spec version — the "this PDF is agent-readable" flag</td></tr>
+    <tr><td><code>AgentReadability</code></td><td><code>agentic-pdf-spec/1.1</code></td><td>Marks conformance and spec version — the "this PDF is agent-readable" flag</td></tr>
     <tr><td><code>CanonicalSource</code></td><td>URI string</td><td>Authoritative source location</td></tr>
     <tr><td><code>Title</code> / <code>Subject</code></td><td>mirrors frontmatter</td><td>Standard PDF metadata stays consistent with the layer</td></tr>
     <tr><td><code>Keywords</code></td><td><code>agent-readable agentic-pdf llm-readable</code></td><td>Searchable marker for indexing tools</td></tr>
@@ -322,7 +322,11 @@ agentic-pdf read report.pdf --raw | llm "summarize this"</code></pre>
 
 <section id="verification">
   <h2>Verification &amp; scoring</h2>
-  <p>Score a document the way the web spec scores a site — passed checks over total checks:</p>
+  <p>
+    The normative specification is
+    <a href="https://github.com/msanvido/agentic-pdf/blob/main/SPEC.md">SPEC.md</a>.
+    Score a document the way the web spec scores a site — passed checks over total checks:
+  </p>
   <pre><code>score = round(passed checks / total checks × 100)</code></pre>
   <table>
     <tr><th>Check</th><th>Weight</th></tr>
@@ -415,7 +419,7 @@ python -c "import pikepdf; \
 </section>
 
 <footer class="site-footer">
-  <span>agentic-pdf · spec v1.0</span>
+  <span>agentic-pdf · spec v1.1</span>
   <a href="https://github.com/msanvido/agentic-pdf">GitHub</a>
   <a href="viewer/">Viewer</a>
   <a href="https://vercel.com/kb/guide/agent-readability-spec">Inspiration: Vercel agent-readability spec</a>

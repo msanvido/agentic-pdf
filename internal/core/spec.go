@@ -6,7 +6,7 @@ import (
 )
 
 const (
-	SpecVersion = "1.0"
+	SpecVersion = "1.1"
 	AgentMD     = "agent.md"
 	AgentHTML   = "agent.html"
 	LLMSTxt     = "llms.txt"

@@ -12,6 +12,7 @@ The format follows the practices of the
 sections), adapted from websites to PDF.
 
 **Live spec guide + hosted viewer:** <https://msanvido.github.io/agentic-pdf/>
+**Normative specification:** [SPEC.md](SPEC.md)
 
 ## How it works
 
