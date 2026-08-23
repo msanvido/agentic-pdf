@@ -77,6 +77,8 @@ func main() {
 		err = cli.InstallWatch(flagValue(args, "--spool"), flagValue(args, "--out"))
 	case "uninstall-watch":
 		err = cli.UninstallWatch()
+	case "debug-tables":
+		err = cli.DebugTables(args[1])
 	default:
 		fmt.Fprintf(os.Stderr, "unknown command: %s\n\n", args[0])
 		fmt.Print(help())

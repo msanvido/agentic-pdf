@@ -132,6 +132,30 @@ func Check(input string) error {
 	return nil
 }
 
+// DebugTables prints detected tables for a PDF (development aid).
+func DebugTables(input string) error {
+	data, err := os.ReadFile(input)
+	if err != nil {
+		return err
+	}
+	pages, err := core.ExtractPages(data)
+	if err != nil {
+		return err
+	}
+	for i, pg := range pages {
+		fmt.Printf("page %d: %d words, %d lines\n", pg.Page, len(pg.Words), len(pg.Lines))
+		if i > 1 && pg.Page > 3 {
+			break
+		}
+	}
+	tables := core.DetectTables(pages)
+	fmt.Printf("detected %d table(s)\n", len(tables))
+	for _, t := range tables {
+		fmt.Printf("- p%d caption=%q header=%v rows=%d\n", t.Page, t.Caption, t.Header, len(t.Rows))
+	}
+	return nil
+}
+
 func orUnknown(s string) string {
 	if s == "" {
 		return "?"

@@ -202,7 +202,10 @@ endtrailer
 agentic-pdf print docs/demo/report.txt -o report.pdf
 
 <span class="c"># real-world stress test: a 77-page Federal Reserve report full of charts</span>
-agentic-pdf print demo/fed-monetary-policy-report-july-2026.pdf
+agentic-pdf print docs/demo/fed-monetary-policy-report-july-2026.pdf
+
+<span class="c"># chart + table demo: table becomes markdown, figure caption is preserved</span>
+agentic-pdf print docs/demo/acme-q2-results.pdf
 
 <span class="c"># verify the layer</span>
 agentic-pdf check report.pdf
@@ -258,8 +261,8 @@ agentic-pdf read report.pdf --raw | llm "summarize this"</code></pre>
     <tr><td><code>## Summary</code></td><td>The description — enough context to decide relevance without reading further</td></tr>
     <tr><td><code>## Table of Contents</code></td><td>Links/list of major sections (when 2+ exist)</td></tr>
     <tr><td><code>## Content</code></td><td>The mirrored document body, structured into headings, paragraphs and lists; per-page anchors (<code>_​(p.N)_</code>) preserve provenance back to visual pages</td></tr>
-    <tr><td><code>## Tables</code></td><td>Detected tabular blocks rendered as markdown tables with captions and page refs. Optional — present when the generator detects tables</td></tr>
-    <tr><td><code>## Figures</code></td><td>Captions of figures/charts/exhibits with page refs. Chart pixels stay in the visual layer; the captions give agents provenance and let them tell readers which page to view. Optional</td></tr>
+    <tr><td><code>## Tables</code></td><td>Detected tabular blocks rendered as markdown tables with captions and page refs — e.g. a printed financial table comes out as <code>| Segment | Revenue | YoY |</code> rows. Best-effort: chart axis labels and legends are filtered. Optional — present when tables are detected</td></tr>
+    <tr><td><code>## Figures</code></td><td>Captions of figures/charts/exhibits with page refs. Chart pixels stay in the visual layer; the captions give agents provenance and let them tell readers which page to view. Data labels printed on charts (percentages, values) surface in <code>## Content</code>. Optional</td></tr>
     <tr><td><code>## Sitemap</code></td><td>Inventory of this file, sibling attachments, and the canonical PDF</td></tr>
     <tr><td><code>## Glossary</code></td><td>Recurring terminology and acronyms with occurrence counts, resolving ambiguity</td></tr>
   </table>

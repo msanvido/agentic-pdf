@@ -114,7 +114,8 @@ docs/demo/            sample inputs (see below)
 | `docs/demo/sample.txt` | Minimal plain-text report |
 | `docs/demo/report.txt` | Rich structure: numbered sections, lists, metrics, risk factors (prints to 2 pages) |
 | `docs/demo/memo.txt` | Business memo with headers, mixed formatting |
-| `docs/demo/fed-monetary-policy-report-july-2026.pdf` | Real-world stress test: 77-page Federal Reserve Monetary Policy Report full of charts and graphs (public domain). The charts stay in the visual layer; the agent layer carries the extracted narrative text |
+| `docs/demo/acme-q2-results.pdf` | **Pie chart + data table**: the table is extracted as a markdown table into `## Tables`, the chart's caption lands in `## Figures`, and its wedge labels appear in `## Content`. Regenerate with `gen_acme_report.py` |
+| `docs/demo/fed-monetary-policy-report-july-2026.pdf` | Real-world stress test: 77-page Federal Reserve Monetary Policy Report (public domain). Tables become markdown; 60+ figure captions preserved |
 
 Pre-generated agentic versions of these live in `docs/demo/` for the hosted viewer.
 

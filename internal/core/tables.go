@@ -141,34 +141,53 @@ func buildTable(run [][][]WordPos, page int, pageCaptions string) *Table {
 		return nil
 	}
 
-	// Column anchors: segment start positions of the first row that has
-	// exactly nCols segments.
-	var anchors []float64
+	// Column anchors: take the reference row (first with exactly nCols
+	// segments) and derive a horizontal band per column from its extents.
+	// Bands tolerate left/right/center cell alignment across rows.
+	var ref []([]WordPos)
 	for _, row := range run {
 		if len(row) == nCols {
-			for _, seg := range row {
-				anchors = append(anchors, seg[0].X)
-			}
+			ref = row
 			break
 		}
 	}
-	if len(anchors) < minCols {
+	if ref == nil {
 		return nil
 	}
+	starts := make([]float64, nCols)
+	ends := make([]float64, nCols)
+	for c, seg := range ref {
+		starts[c] = seg[0].X
+		last := seg[len(seg)-1]
+		ends[c] = last.X + last.W
+	}
+	bounds := make([]float64, nCols+1)
+	bounds[0] = -1e9
+	bounds[nCols] = 1e9
+	for c := 0; c+1 < nCols; c++ {
+		bounds[c+1] = (ends[c] + starts[c+1]) / 2
+	}
+	segCenter := func(seg []WordPos) (float64, bool) {
+		first := seg[0]
+		last := seg[len(seg)-1]
+		return (first.X + last.X + last.W) / 2, true
+	}
 
-	// Keep only rows whose segments map cleanly onto the anchors.
+	// Keep only rows whose segments map cleanly onto the column bands.
 	var cells [][]string
 	for _, row := range run {
 		rowCells := make([]string, nCols)
 		ok := true
 		for _, seg := range row {
-			best, bestDist := -1, 1e9
-			for c, ax := range anchors {
-				if d := abs(seg[0].X - ax); d < bestDist {
-					best, bestDist = c, d
+			cx, _ := segCenter(seg)
+			best := -1
+			for c := 0; c < nCols; c++ {
+				if cx >= bounds[c] && cx <= bounds[c+1] {
+					best = c
+					break
 				}
 			}
-			if best < 0 || bestDist > colClusterTol {
+			if best < 0 { // fragment straddles a column boundary — not a grid
 				ok = false
 				break
 			}
@@ -229,18 +248,31 @@ func buildTable(run [][][]WordPos, page int, pageCaptions string) *Table {
 	}
 
 	// Chart legends: a row repeating identical cells (e.g. "Monthly | Monthly")
-	// plus no numeric content and no caption means figure furniture.
-	hasDup := false
+	// is figure furniture, not data — even if other rows carry numbers.
 	for _, row := range cells[1:] {
-		for i := 0; i < len(row); i++ {
-			for j := i + 1; j < len(row); j++ {
-				if strings.EqualFold(row[i], row[j]) {
-					hasDup = true
-				}
+		same := true
+		for i := 1; i < len(row); i++ {
+			if !strings.EqualFold(row[i], row[0]) {
+				same = false
+				break
+			}
+		}
+		if same && len(row) > 1 {
+			return nil
+		}
+	}
+	// Footnote-marker grids ("t t | t | t t t"): dominated by 1–2 char cells.
+	short := 0
+	total := 0
+	for _, row := range cells[1:] {
+		for _, cell := range row {
+			total++
+			if len(strings.TrimSpace(cell)) <= 2 {
+				short++
 			}
 		}
 	}
-	if hasDup && !tableHasDigits(cells) && strings.TrimSpace(pageCaptions) == "" {
+	if total > 0 && short*100 > total*60 {
 		return nil
 	}
 	// Two-column, digit-free, uncaptioned blocks are page-layout artifacts
