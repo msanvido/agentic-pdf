@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 )
 
@@ -16,52 +18,57 @@ var agenticPPD string
 //go:embed pdffilter.sh
 var pdfFilterScript string
 
+// DefaultReceiverPort is the localhost port the CUPS backend hands printed
+// PDFs to; the user-space receiver (launchd agent) listens here.
+const DefaultReceiverPort = 47631
+
 func toJSON(v any) string {
 	b, _ := json.MarshalIndent(v, "", "  ")
 	return string(b)
 }
 
 // InstallBackend installs the CUPS virtual printer (macOS/Linux with CUPS).
+// InstallBackend installs the CUPS virtual printer. Architecture on macOS:
+//
+//	app --print--> cupsd (sandboxed) --> backend script
+//	                                   | curl POST localhost:<port>
+//	                                   v
+//	receiver ("agentic-pdf receive", user LaunchAgent) --convert--> output dir
+//
+// Everything after the sandbox boundary runs as the logged-in user.
 func InstallBackend(spool string) error {
 	if spool == "" {
-		// /Users/Shared is world-writable AND not TCC-protected; cupsd runs
-		// sandboxed and cannot write into ~/Documents even as root.
-		spool = "/Users/Shared/Agentic-PDF"
+		home, _ := os.UserHomeDir()
+		spool = filepath.Join(home, "Documents", "Agentic-PDF")
+	}
+	if err := os.MkdirAll(spool, 0o755); err != nil {
+		return err
 	}
 	exe, err := os.Executable()
 	if err != nil {
 		return fmt.Errorf("resolving executable path: %w", err)
 	}
+	port := DefaultReceiverPort
 
-	script := buildBackendScript(exe, spool)
+	fmt.Fprintln(os.Stderr, "Installing CUPS backend (requires sudo)…")
+
+	// 1. User-space receiver as a LaunchAgent, started immediately.
+	if runtime.GOOS == "darwin" {
+		if err := installReceiveAgent(exe, port, spool); err != nil {
+			return err
+		}
+	}
+
+	// 2. Backend + filter + queue (root-owned locations).
+	script := buildBackendScript(exe, port)
 	tmpScript := "/tmp/agentic-pdf-backend-agentpdf"
 	if err := os.WriteFile(tmpScript, []byte(script), 0o755); err != nil {
 		return err
 	}
-	if err := os.MkdirAll(spool, 0o777); err != nil {
-		return err
-	}
-	// When running under sudo, hand the spool dir back to the invoking user
-	// (cupsd runs as root and can write anywhere except TCC-protected paths).
-	owner := os.Getenv("SUDO_USER")
-	if owner == "" {
-		owner = os.Getenv("USER")
-	}
-
-	fmt.Fprintln(os.Stderr, "Installing CUPS backend (requires sudo)…")
 	run("sudo", "cp", tmpScript, "/usr/libexec/cups/backend/agentpdf")
 	run("sudo", "chown", "root:wheel", "/usr/libexec/cups/backend/agentpdf")
 	run("sudo", "chmod", "755", "/usr/libexec/cups/backend/agentpdf")
-	run("sudo", "mkdir", "-p", spool)
-	run("sudo", "chmod", "1777", spool)
-	if owner != "" && owner != "root" {
-		run("sudo", "chown", owner, spool)
-	}
-	// Custom pass-through PPD: CUPS converts any incoming format to PDF,
-	// then hands the PDF to our backend untouched (via the agentic_pdf
-	// pass-through filter). Raw queues are no longer supported on macOS,
-	// and PPD-based queues would otherwise deliver PostScript we cannot
-	// re-process.
+
 	ppd := "/tmp/agentic-pdf.ppd"
 	if err := os.WriteFile(ppd, []byte(agenticPPD), 0o644); err != nil {
 		return err
@@ -74,7 +81,7 @@ func InstallBackend(spool string) error {
 	run("sudo", "chown", "root:wheel", "/usr/libexec/cups/filter/agentic_pdf")
 	run("sudo", "chmod", "755", "/usr/libexec/cups/filter/agentic_pdf")
 	run("sudo", "lpadmin", "-p", "AgenticPDF",
-		"-v", "agentpdf:"+spool,
+		"-v", fmt.Sprintf("agentpdf://127.0.0.1:%d", port),
 		"-P", ppd,
 		"-D", "Agentic PDF Printer")
 	// A single backend failure must not stop the queue.
@@ -85,16 +92,54 @@ func InstallBackend(spool string) error {
 	run("sudo", "launchctl", "kickstart", "-k", "system/org.cups.cupsd")
 
 	fmt.Printf(`✅ Installed "Agentic PDF Printer".
-   - Backend: /usr/libexec/cups/backend/agentpdf
-   - Queue:   AgenticPDF
+   - Queue:   AgenticPDF (available in every Print dialog)
    - Output:  %s
+   - Receiver: user LaunchAgent on 127.0.0.1:%d
 Print from any app and pick "Agentic PDF Printer" — the resulting PDF lands
 in the output folder with an embedded agent-readable layer.
-`, spool)
+`, spool, port)
 	return nil
 }
 
-// UninstallBackend removes the CUPS virtual printer.
+func installReceiveAgent(exe string, port int, spool string) error {
+	plist := receivePlistPath()
+	content := fmt.Sprintf(`<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key><string>%s</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>%s</string>
+        <string>receive</string>
+        <string>--port</string>
+        <string>%d</string>
+        <string>--out</string>
+        <string>%s</string>
+    </array>
+    <key>RunAtLoad</key><true/>
+    <key>KeepAlive</key><true/>
+    <key>StandardErrorPath</key><string>/tmp/agentic-pdf-receive.log</string>
+</dict>
+</plist>
+`, receiveLabel, exe, port, spool)
+	if err := os.WriteFile(plist, []byte(content), 0o644); err != nil {
+		return err
+	}
+	tryRun("launchctl", "unload", plist)
+	if err := exec.Command("launchctl", "load", plist).Run(); err != nil {
+		return fmt.Errorf("loading receiver LaunchAgent: %w", err)
+	}
+	return nil
+}
+
+const receiveLabel = "com.agentic-pdf.receive"
+
+func receivePlistPath() string {
+	home, _ := os.UserHomeDir()
+	return filepath.Join(home, "Library", "LaunchAgents", receiveLabel+".plist")
+}
+
 func UninstallBackend() error {
 	fmt.Fprintln(os.Stderr, "Removing CUPS backend (requires sudo)…")
 	tryRun("sudo", "lpadmin", "-x", "AgenticPDF")
@@ -104,17 +149,14 @@ func UninstallBackend() error {
 	return nil
 }
 
-func buildBackendScript(cliPath, spool string) string {
+func buildBackendScript(cliPath string, port int) string {
 	return `#!/bin/sh
-# CUPS backend for agentic-pdf — converts print jobs into agentic PDFs.
+# CUPS backend for agentic-pdf.
 #
-# NOTE: cupsd executes backends inside a sandbox that denies writes almost
-# everywhere (including $SPOOL_DIR). Strategy:
-#   - stage the converted PDF in /var/spool/cups/agentic-pdf (always writable)
-#   - hand it off to the un-sandboxed watcher/agent running as the user via
-#     launchctl kickstart -k (user session), falling back to leaving it in the
-#     staging folder with a notice file
-#   - every step is logged through syslog (logger), which sandboxes cannot block
+# cupsd runs backends inside a sandbox that denies nearly all filesystem
+# writes, so this script simply hands the (already PDF) spool to the
+# user-space receiver over localhost HTTP. The receiver does the actual
+# conversion and delivery with normal user permissions.
 
 # Discovery (no args): advertise the device.
 if [ $# -eq 0 ]; then
@@ -123,67 +165,46 @@ if [ $# -eq 0 ]; then
 fi
 
 job_id="$1"; user="$2"; title="$3"; copies="$4"; options="$5"; file="$6"
-SPOOL_DIR="` + spool + `"
 
 say() {
-  echo "agentpdf: $*" >&2          # -> /var/log/cups/error_log (readable for debugging)
+  echo "agentpdf: $*" >&2          # -> /var/log/cups/error_log
   logger -t agentpdf "$*" 2>/dev/null
 }
-say "job $job_id: title='$title' file='$file'"
 
-# Find a writable work directory: the cupsd sandbox denies most of the
-# filesystem, so probe rather than assume.
-WORKDIR=""
-for cand in "/var/tmp/agentic-pdf" "/tmp/agentic-pdf" "$SPOOL_DIR"; do
-  if mkdir -p "$cand" 2>/dev/null && touch "$cand/.wtest" 2>/dev/null; then
-    rm -f "$cand/.wtest"
-    WORKDIR="$cand"
-    say "job $job_id: workdir=$cand"
-    break
-  fi
-done
-if [ -z "$WORKDIR" ]; then
-  say "job $job_id: FAILED - no writable directory found"
-  exit 1
-fi
+PORT=` + strconv.Itoa(port) + `
+URL="http://127.0.0.1:$PORT/print"
 
-# Job data arrives on stdin when CUPS pipes filtered output.
-in="$WORKDIR/in-$job_id.pdf"
+# Read job data (stdin) or spool file into a temp buffer in /tmp — one of
+# the few writable locations inside the backend sandbox.
+tmp_in=$(mktemp /tmp/agentpdf.XXXXXX)
 if [ -n "$file" ] && [ -r "$file" ]; then
-  cat "$file" > "$in"
+  cat "$file" > "$tmp_in"
 else
-  cat > "$in"
+  cat > "$tmp_in"
 fi
 
-magic=$(head -c 4 "$in" 2>/dev/null)
+magic=$(head -c 4 "$tmp_in" 2>/dev/null)
 if [ "$magic" != "%PDF" ]; then
   say "job $job_id: rejected non-PDF input"
-  rm -f "$in"
+  rm -f "$tmp_in"
   exit 1
 fi
 
-"` + cliPath + `" print "$in" -o "$in.out" --title "$title" 2>&1 | while IFS= read -r line; do say "$line"; done
+rc=$(curl -s --max-time 120 \
+      -H "X-Job-Id: $job_id" \
+      -H "X-Job-Title: $title" \
+      --data-binary @"$tmp_in" \
+      -o /dev/null -w "%{http_code}" \
+      "$URL")
+rm -f "$tmp_in"
 
-if [ ! -s "$in.out" ]; then
-  say "job $job_id: FAILED - no output produced"
-  exit 1
+if [ "$rc" = "200" ]; then
+  say "job $job_id: delivered via receiver"
+  echo "READY"
+  exit 0
 fi
-
-safe_title=$(printf '%s' "$title" | tr '/:' '__' | cut -c1-80)
-final="$SPOOL_DIR/$safe_title-$job_id.pdf"
-
-if mv "$in.out" "$final" 2>/dev/null; then
-  chmod 644 "$final" 2>/dev/null
-  rm -f "$in"
-  say "job $job_id: wrote $final"
-else
-  mv "$in.out" "$WORKDIR/$safe_title-$job_id.pdf" 2>/dev/null
-  rm -f "$in"
-  say "job $job_id: spool not writable - left result in $WORKDIR/"
-fi
-
-echo "READY"
-exit 0
+say "job $job_id: receiver error HTTP $rc (is 'agentic-pdf receive' running?)"
+exit 1
 `
 }
 

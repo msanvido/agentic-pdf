@@ -43,6 +43,10 @@ Usage:
       Install the watcher as an auto-start service:
       Windows scheduled task / macOS LaunchAgent / Linux systemd unit.
   agentic-pdf uninstall-watch                 Remove the watcher service.
+
+  agentic-pdf receive [--port 47631] [--out DIR]
+      Run the HTTP receiver used by the CUPS backend (started automatically
+      by install-backend on macOS).
 `
 }
 
@@ -77,6 +81,8 @@ func main() {
 		err = cli.InstallWatch(flagValue(args, "--spool"), flagValue(args, "--out"))
 	case "uninstall-watch":
 		err = cli.UninstallWatch()
+	case "receive":
+		err = cmdReceive(args[1:])
 	case "debug-tables":
 		err = cli.DebugTables(args[1])
 	default:
@@ -209,6 +215,32 @@ func cmdWatch(args []string) error {
 		}
 	}
 	return cli.Watch(spool, out, false)
+}
+
+func cmdReceive(args []string) error {
+	out := ""
+	port := cli.DefaultReceiverPort
+	for i := 0; i < len(args); i++ {
+		switch args[i] {
+		case "--port":
+			i++
+			if i >= len(args) {
+				return fmt.Errorf("receive: --port needs a value")
+			}
+			p, err := strconv.Atoi(args[i])
+			if err != nil {
+				return fmt.Errorf("receive: invalid port %q", args[i])
+			}
+			port = p
+		case "--out":
+			i++
+			if i >= len(args) {
+				return fmt.Errorf("receive: --out needs a value")
+			}
+			out = args[i]
+		}
+	}
+	return cli.Receive(port, out)
 }
 
 func flagValue(args []string, flag string) string {

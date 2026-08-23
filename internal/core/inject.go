@@ -50,9 +50,63 @@ func InjectAgentLayer(pdfBytes []byte, pages []PageText, title, description, can
 
 	conf := model.NewDefaultConfiguration()
 
+	// Pass 0: drop any pre-existing agent layer (double-printing an agentic
+	// PDF must refresh the layer, not stack a stale duplicate next to it).
+	// pdfcpu's RemoveAttachments panics on some name trees unless the
+	// document is normalized (validated + optimized) first.
+	normalized, nerr := func() (out []byte, err error) {
+		defer func() {
+			if p := recover(); p != nil {
+				err = fmt.Errorf("normalize failed: %v", p)
+			}
+		}()
+		ctxIn, err := api.ReadAndValidate(bytes.NewReader(pdfBytes), conf)
+		if err != nil {
+			return nil, err
+		}
+		if err := api.OptimizeContext(ctxIn); err != nil {
+			return nil, err
+		}
+		var buf bytes.Buffer
+		if err := api.WriteContext(ctxIn, &buf); err != nil {
+			return nil, err
+		}
+		return buf.Bytes(), nil
+	}()
+	atts, _ := ReadAttachments(normalized)
+	cleaned := pdfBytes
+	if nerr == nil && hasAnyAgentAttachment(normalized) {
+		// Only request names that exist — pdfcpu panics on absent ones.
+		var toRemove []string
+		for _, name := range []string{AgentMD, AgentHTML, LLMSTxt} {
+			for _, a := range atts {
+				if a.Name == name {
+					toRemove = append(toRemove, name)
+					break
+				}
+			}
+		}
+		remove := func(b []byte, names []string) (out []byte, err error) {
+			defer func() {
+				if p := recover(); p != nil {
+					err = fmt.Errorf("remove failed: %v", p)
+				}
+			}()
+			var outClean bytes.Buffer
+			if err := api.RemoveAttachments(bytes.NewReader(b), &outClean,
+				names, conf); err != nil {
+				return nil, err
+			}
+			return outClean.Bytes(), nil
+		}
+		if outClean, rerr := remove(normalized, toRemove); rerr == nil {
+			cleaned = outClean
+		}
+	}
+
 	// Pass 1: attach files.
 	var out bytes.Buffer
-	rs := bytes.NewReader(pdfBytes)
+	rs := bytes.NewReader(cleaned)
 	if err := api.AddAttachments(rs, &out, files, true, conf); err != nil {
 		return nil, fmt.Errorf("attaching agent layer: %w", err)
 	}
@@ -78,6 +132,20 @@ func InjectAgentLayer(pdfBytes []byte, pages []PageText, title, description, can
 		return nil, fmt.Errorf("setting properties: %w", err)
 	}
 	return out2.Bytes(), nil
+}
+
+// hasAnyAgentAttachment reports whether the PDF already carries a layer.
+func hasAnyAgentAttachment(pdfBytes []byte) bool {
+	atts, err := ReadAttachments(pdfBytes)
+	if err != nil {
+		return false
+	}
+	for _, a := range atts {
+		if a.Name == AgentMD || a.Name == AgentHTML || a.Name == LLMSTxt {
+			return true
+		}
+	}
+	return false
 }
 
 func escapeAttr(s string) string {
