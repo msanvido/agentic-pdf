@@ -71,7 +71,7 @@ agentic-pdf read report.pdf --raw | llm "summarize this"
 | Platform | Setup | Workflow |
 | --- | --- | --- |
 | macOS | `sudo agentic-pdf install-backend` | Any app → Print → *Agentic PDF Printer* → agentic PDF in `/Users/Shared/Agentic-PDF` |
-| Windows | `agentic-pdf install-watch` | Any app → *Microsoft Print to PDF* → save into `/Users/Shared/Agentic-Spool` (Windows: `%USERPROFILE%\Documents\Agentic-Spool`) → converted automatically into `/Users/Shared/Agentic-PDF` (Windows: `%USERPROFILE%\Documents\Agentic-PDF`), with a toast notification |
+| Windows | `agentic-pdf install-watch` | Any app → *Microsoft Print to PDF* → save into `%USERPROFILE%\Documents\Agentic-Spool` → converted automatically into `%USERPROFILE%\Documents\Agentic-PDF`, with a toast notification |
 | Linux | `agentic-pdf install-watch` | Drop any PDF into the spool folder; a systemd user service converts it |
 
 Windows does not permit unsigned third-party print drivers, so the watcher
