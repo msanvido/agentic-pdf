@@ -40,5 +40,6 @@
 
 *% Pass the PDF spool through untouched: the agentic-pdf backend
 *% consumes PDFs directly. Other input formats are converted to PDF
-*% by the standard CUPS filter chain before reaching this point.
-*cupsFilter: "application/vnd.cups-pdf 0 -"
+*% by the standard CUPS filter chain (via agentic_pdf's cat) before
+*% reaching the backend.
+*cupsFilter: "application/vnd.cups-pdf 0 agentic_pdf"

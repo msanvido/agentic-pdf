@@ -13,6 +13,9 @@ import (
 //go:embed agentic.ppd
 var agenticPPD string
 
+//go:embed pdffilter.sh
+var pdfFilterScript string
+
 func toJSON(v any) string {
 	b, _ := json.MarshalIndent(v, "", "  ")
 	return string(b)
@@ -55,13 +58,21 @@ func InstallBackend(spool string) error {
 		run("sudo", "chown", owner, spool)
 	}
 	// Custom pass-through PPD: CUPS converts any incoming format to PDF,
-	// then hands the PDF to our backend untouched (the "-" filter). Raw
-	// queues are no longer supported on macOS, and PPD-based queues would
-	// otherwise deliver PostScript we cannot re-process.
+	// then hands the PDF to our backend untouched (via the agentic_pdf
+	// pass-through filter). Raw queues are no longer supported on macOS,
+	// and PPD-based queues would otherwise deliver PostScript we cannot
+	// re-process.
 	ppd := "/tmp/agentic-pdf.ppd"
 	if err := os.WriteFile(ppd, []byte(agenticPPD), 0o644); err != nil {
 		return err
 	}
+	pdff := "/tmp/agentic-pdf-filter"
+	if err := os.WriteFile(pdff, []byte(pdfFilterScript), 0o755); err != nil {
+		return err
+	}
+	run("sudo", "cp", pdff, "/usr/libexec/cups/filter/agentic_pdf")
+	run("sudo", "chown", "root:wheel", "/usr/libexec/cups/filter/agentic_pdf")
+	run("sudo", "chmod", "755", "/usr/libexec/cups/filter/agentic_pdf")
 	run("sudo", "lpadmin", "-p", "AgenticPDF",
 		"-v", "agentpdf:"+spool,
 		"-P", ppd,
