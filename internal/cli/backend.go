@@ -121,7 +121,7 @@ func installReceiveAgent(exe string, port int, spool string) error {
     <key>StandardErrorPath</key><string>%s/.receive.log</string>
 </dict>
 </plist>
-`, receiveLabel, exe, spool, spool, port)
+`, receiveLabel, exe, port, spool, spool)
 	if err := os.WriteFile(plist, []byte(content), 0o644); err != nil {
 		return err
 	}

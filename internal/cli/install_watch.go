@@ -109,7 +109,7 @@ func installWatchMac(exe, spool, outDir string) error {
     <key>StandardErrorPath</key><string>%s/.watch.log</string>
 </dict>
 </plist>
-`, macPlistLabel, exe, spool, outDir)
+`, macPlistLabel, exe, spool, spool, outDir)
 	if err := os.WriteFile(plist, []byte(content), 0o644); err != nil {
 		return err
 	}
