@@ -44,6 +44,7 @@
   <strong>On this page</strong>
   <ol>
     <li><a href="#problem">The opportunity</a></li>
+    <li><a href="#raw">Why raw PDFs resist machines</a></li>
     <li><a href="#how">How it works</a></li>
     <li><a href="#principles">Design principles</a></li>
     <li><a href="#checklist">Quick-start checklist</a></li>
@@ -123,6 +124,38 @@ Agentic: PDF ──▶ extract agent.md ─────────────�
   </div>
 </section>
 
+<section id="raw">
+  <h2>Why raw PDFs resist machines</h2>
+  <p>
+    A PDF looks like a document, but inside it is a <em>printing instruction
+    sheet</em>. Text is stored as glyph-drawing commands at explicit canvas
+    coordinates — there are no paragraphs, headings, or tables anywhere in the
+    file. Here is a real content stream from a PDF produced by this project:
+  </p>
+  <pre><code>4 0 obj
+&lt;&lt; /Length 2451 /Filter /FlateDecode &gt;&gt;
+stream
+q 1 0 0 1 16.84 0 cm BT 0.0001 Tc 12 0 0 12 0 803.044 Tm /TT1 1 Tf (ACME INDUSTRIES PLC) Tj ET Q
+q 1 0 0 1 16.84 0 cm BT 0.0001 Tc 12 0 0 12 0 791.044 Tm /TT1 1 Tf (...) Tj ET Q
+<span class="c">…hundreds more lines like this, then…</span>
+xref
+0 19
+0000000000 65535 f 
+endtrailer
+%%EOF</code></pre>
+  <p>Everything an agent needs to understand the page is missing from those bytes:</p>
+  <ul class="checklist">
+    <li><strong>No reading order.</strong> "803.044" and "791.044" happen to be consecutive lines here; in a two-column paper, successive instructions jump between columns.</li>
+    <li><strong>No semantics.</strong> Nothing distinguishes a heading from a footnote — both are just <code>(text) Tj</code> at some position in some font.</li>
+    <li><strong>No structure.</strong> A table is dozens of independently drawn text runs plus ruled rectangles; a chart is opaque vector paths or pixels.</li>
+    <li><strong>Compression.</strong> Content streams are Flate-compressed binary — raw byte scanning sees nothing useful at all.</li>
+  </ul>
+  <p class="muted">
+    This is precisely why the extraction industry exists, and why embedding the
+    structured layer alongside the visual pages is the cheaper, safer path.
+  </p>
+</section>
+
 <section id="how">
   <h2>How it works</h2>
   <p>
@@ -180,6 +213,7 @@ agentic-pdf read report.pdf --raw | llm "summarize this"</code></pre>
     <li><code>agent.md</code> attachment present, MIME type <code>text/markdown</code></li>
     <li>Frontmatter includes <code>title</code>, <code>description</code> (50+ chars), <code>doc_version</code>, <code>last_updated</code>, <code>generator</code></li>
     <li>Body contains <code># Title</code>, <code>## Summary</code>, <code>## Content</code>, <code>## Sitemap</code>, <code>## Glossary</code> sections</li>
+    <li>Tabular content mirrored as markdown tables in <code>## Tables</code>; figure/chart captions listed in <code>## Figures</code> with page references (when the source contains them)</li>
     <li>Info dictionary sets <code>AgentReadability</code> = <code>agentic-pdf-spec/1.0</code></li>
     <li>Canonical source recorded via frontmatter <code>canonical</code> and Info key <code>CanonicalSource</code></li>
     <li>Visual pages byte-for-byte equivalent in appearance to a non-agentic print</li>
@@ -224,6 +258,8 @@ agentic-pdf read report.pdf --raw | llm "summarize this"</code></pre>
     <tr><td><code>## Summary</code></td><td>The description — enough context to decide relevance without reading further</td></tr>
     <tr><td><code>## Table of Contents</code></td><td>Links/list of major sections (when 2+ exist)</td></tr>
     <tr><td><code>## Content</code></td><td>The mirrored document body, structured into headings, paragraphs and lists; per-page anchors (<code>_​(p.N)_</code>) preserve provenance back to visual pages</td></tr>
+    <tr><td><code>## Tables</code></td><td>Detected tabular blocks rendered as markdown tables with captions and page refs. Optional — present when the generator detects tables</td></tr>
+    <tr><td><code>## Figures</code></td><td>Captions of figures/charts/exhibits with page refs. Chart pixels stay in the visual layer; the captions give agents provenance and let them tell readers which page to view. Optional</td></tr>
     <tr><td><code>## Sitemap</code></td><td>Inventory of this file, sibling attachments, and the canonical PDF</td></tr>
     <tr><td><code>## Glossary</code></td><td>Recurring terminology and acronyms with occurrence counts, resolving ambiguity</td></tr>
   </table>
@@ -294,6 +330,7 @@ agentic-pdf read report.pdf --raw | llm "summarize this"</code></pre>
     <tr><td>Canonical source declared (frontmatter and/or Info)</td><td>medium</td></tr>
     <tr><td><code>agent.html</code> mirror present with meta tags</td><td>low</td></tr>
     <tr><td>Glossary covers detected terminology</td><td>low</td></tr>
+    <tr><td>Tables rendered as markdown; figure captions preserved with page refs</td><td>low (bonus)</td></tr>
   </table>
   <p class="muted">Ratings: 90–100 excellent · 70–89 good · 50–89 fair · below 50 needs work.</p>
   <div class="callout green">

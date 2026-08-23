@@ -52,12 +52,13 @@
 <body>
 <header>
   <h1><a href="../">agentic<span style="color:var(--accent)">-pdf</span></a> <span class="crumb">/ viewer</span></h1>
+  <a class="btn" id="back-btn" hidden>← Back</a>
   <span class="badge" id="layer-badge">no file loaded</span>
   <span class="spacer"></span>
   <a class="btn" href="https://github.com/msanvido/agentic-pdf" target="_blank" rel="noopener">GitHub ↗</a>
   <label class="btn" for="file-input">Open local PDF…</label>
   <input type="file" id="file-input" accept="application/pdf,.pdf">
-  <button class="btn primary" id="toggle-agent" disabled>Agent layer</button>
+  <button class="btn primary" id="toggle-agent" disabled>View agentic layer</button>
 </header>
 <main>
   <div id="pdf-pane">
@@ -127,11 +128,22 @@
   }
 
   toggleBtn.onclick = () => {
-    if (!toggleBtn.disabled) {
-      agentPane.classList.toggle("hidden");
-      toggleBtn.classList.toggle("primary", agentPane.classList.contains("hidden"));
-    }
+    if (toggleBtn.disabled) return;
+    const opening = agentPane.classList.contains("hidden");
+    agentPane.classList.toggle("hidden", !opening);
+    toggleBtn.classList.toggle("primary", !opening);
+    toggleBtn.textContent = opening ? "Close agentic layer" : "View agentic layer";
   };
+
+  // Back button: shown when the viewer runs under a site root (/viewer/ on
+  // GitHub Pages); links back to the spec guide. Hidden on the local server,
+  // where "/" is this page.
+  const backBtn = document.getElementById("back-btn");
+  if (/\/viewer\//.test(location.pathname)) {
+    const root = location.pathname.replace(/\/viewer\/[^/]*$/, "/");
+    backBtn.href = root;
+    backBtn.hidden = false;
+  }
 
   document.getElementById("file-input").onchange = async (e) => {
     const f = e.target.files[0];
@@ -224,6 +236,7 @@
 
     agentPane.classList.remove("hidden");
     toggleBtn.classList.remove("primary");
+    toggleBtn.textContent = "Close agentic layer";
   }
 </script>
 </body>

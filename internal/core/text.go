@@ -13,13 +13,20 @@ import (
 	"github.com/ledongthuc/pdf"
 )
 
+type WordPos struct {
+	S      string  // text fragment
+	X, Y   float64 // position in points (X left→right, Y bottom→top)
+	W      float64 // rendered width
+}
+
 type PageText struct {
 	Page  int
 	Lines []string
+	Words []WordPos // positioned fragments, for table/figure detection
 }
 
 // ExtractPages pulls per-page text out of a PDF. The ledongthuc/pdf reader
-// preserves line structure, which our heuristics rely on.
+// preserves line structure and word coordinates, which our heuristics rely on.
 func ExtractPages(pdfBytes []byte) ([]PageText, error) {
 	rd := bytes.NewReader(pdfBytes)
 	reader, err := pdf.NewReader(rd, int64(len(pdfBytes)))
@@ -33,7 +40,7 @@ func ExtractPages(pdfBytes []byte) ([]PageText, error) {
 		if err != nil {
 			return nil, fmt.Errorf("page %d: %w", i+1, err)
 		}
-		pt := PageText{Page: i + 1}
+		pt := PageText{Page: i}
 		for _, line := range strings.Split(txt, "\n") {
 			line = strings.Join(strings.Fields(line), " ")
 			if line != "" {
@@ -42,12 +49,26 @@ func ExtractPages(pdfBytes []byte) ([]PageText, error) {
 				pt.Lines = append(pt.Lines, "")
 			}
 		}
+		pt.Words = positionedWords(page)
 		pages = append(pages, pt)
 	}
 	if pages == nil {
 		return nil, fmt.Errorf("no pages found")
 	}
 	return pages, nil
+}
+
+// positionedWords safely extracts positioned text fragments from a page.
+func positionedWords(page pdf.Page) (words []WordPos) {
+	defer func() { _ = recover() }() // Content() panics on malformed pages
+	for _, t := range page.Content().Text {
+		s := strings.TrimSpace(t.S)
+		if s == "" {
+			continue
+		}
+		words = append(words, WordPos{S: s, X: t.X, Y: t.Y, W: t.W})
+	}
+	return words
 }
 
 var bulletRE = regexp.MustCompile(`^([-*•·‣◦]|\d+[.)])\s+`)

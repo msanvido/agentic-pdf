@@ -134,6 +134,10 @@ func BuildAgentMarkdown(pages []PageText, title, description, canonical, docVers
 	glossary := BuildGlossary(pages)
 	toc := buildTOC(body)
 
+	tables := DetectTables(pages)
+	attachCaptions(pages, tables)
+	figures := DetectFigures(pages)
+
 	var b []string
 	b = append(b, fm.Render(), "", "# "+title, "",
 		"> **For AI agents:** This is the machine-readable layer of a printed PDF document.",
@@ -143,13 +147,55 @@ func BuildAgentMarkdown(pages []PageText, title, description, canonical, docVers
 	if toc != "" {
 		b = append(b, "## Table of Contents", "", toc, "")
 	}
-	b = append(b, "## Content", "", body,
+	b = append(b, "## Content", "", body)
+	if ts := renderTables(tables); ts != "" {
+		b = append(b, "## Tables", "", ts, "")
+	}
+	if fs := renderFigures(figures); fs != "" {
+		b = append(b, "## Figures", "", fs, "")
+	}
+	b = append(b,
 		"## Sitemap", "",
 		"- [agent.md](agent.md) — this file (markdown mirror of the document)",
 		"- [agent.html](agent.html) — HTML rendering of this mirror",
 		"- `/` — the original visual PDF (canonical)",
 		"", "## Glossary", "", glossary, "")
 	return collapseBlank(strings.Join(b, "\n")), fm
+}
+
+// renderTables formats detected tables as markdown. Returns "" when none.
+func renderTables(tables []Table) string {
+	if len(tables) == 0 {
+		return ""
+	}
+	var b []string
+	for i, t := range tables {
+		if t.Caption != "" {
+			b = append(b, "**"+t.Caption+"**", "")
+		} else {
+			b = append(b, "**Table "+itoa(i+1)+"** _(p."+itoa(t.Page)+")_", "")
+		}
+		b = append(b, "| "+strings.Join(t.Header, " | ")+" |")
+		b = append(b, "|"+strings.Repeat(" --- |", len(t.Header)))
+		for _, row := range t.Rows {
+			b = append(b, "| "+strings.Join(row, " | ")+" |")
+		}
+		b = append(b, "")
+	}
+	return strings.Join(b, "\n")
+}
+
+// renderFigures lists figure/chart captions with page references.
+// Chart *pixels* stay in the visual layer; captions give agents provenance.
+func renderFigures(figures []Figure) string {
+	if len(figures) == 0 {
+		return ""
+	}
+	parts := make([]string, len(figures))
+	for i, f := range figures {
+		parts[i] = "- **" + f.Kind + " " + f.Number + "** _(p." + itoa(f.Page) + ")_ — " + f.Title
+	}
+	return strings.Join(parts, "\n")
 }
 
 func buildTOC(body string) string {
