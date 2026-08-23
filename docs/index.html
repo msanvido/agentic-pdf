@@ -361,8 +361,16 @@ agentic-pdf read report.pdf --raw | llm "summarize this"</code></pre>
 git clone https://github.com/msanvido/agentic-pdf &amp;&amp; cd agentic-pdf
 make build            <span class="c"># → bin/agentic-pdf (also: make cross for all platforms)</span>
 
+<span class="c"># authored the layer by hand? embed it without extraction:</span>
+agentic-pdf print contract.pdf --md my-agent.md
+
 <span class="c"># local viewer at http://localhost:4173/?file=doc.pdf</span>
 agentic-pdf view memo.pdf</code></pre>
+  <p class="muted">
+    Extraction quality is best with <a href="https://poppler.freedesktop.org/">poppler</a>
+    installed (<code>brew install poppler</code>) — the binary uses
+    <code>pdftotext -bbox-layout</code> when present, falling back to its built-in Go extractor.
+  </p>
   <p class="muted">
     All examples use files that ship in the repository under <code>docs/demo/</code> —
     including a real, chart-heavy 77-page Federal Reserve Monetary Policy

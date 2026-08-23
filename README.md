@@ -112,7 +112,7 @@ Single Go binary; two pure-Go dependencies (`pdfcpu`, `ledongthuc/pdf`):
 cmd/agentic-pdf/      CLI entrypoint
 internal/core/        spec constants, text extraction, markdown generation,
                       layer injection/extraction
-internal/cli/         commands: print/read/check/watch/installers/notifications
+internal/cli/         commands: agentify/print/read/check/view/watch/installers
 internal/viewer/      viewer server; embeds viewer.html + demo PDFs
 docs/                 GitHub Pages site: spec guide + hosted viewer (generated:
                       make sync-viewer)

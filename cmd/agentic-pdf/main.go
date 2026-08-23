@@ -24,6 +24,16 @@ Usage:
       [--attach file ...] [-o out.pdf] [--title "T"] [--canonical URL]
       Embed a MANUALLY authored agent layer. No extraction happens.
 
+  agentic-pdf read <file.pdf> [--raw | --html | --meta]
+      Extract and display the hidden agentic layer.
+        (default)   markdown without frontmatter
+        --raw       raw markdown exactly as embedded (pipe-friendly for agents)
+        --html      rendered HTML
+        --meta      metadata + frontmatter as JSON
+
+  agentic-pdf view <file.pdf> [--port 4173] [--no-browser]
+      Serve the viewer at http://localhost:<port>/?file=doc.pdf
+
   agentic-pdf check <file.pdf>
       Exit 0 and print a summary if the file carries an agentic layer.
 

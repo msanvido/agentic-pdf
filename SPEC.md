@@ -30,7 +30,9 @@ the content already; this spec defines how to ship it alongside the pixels.
 - **Agent layer** — the set of embedded files defined by this spec.
 - **Mirror** — an agent-layer file whose content represents the visual
   layer's information.
-- **Generator** — any tool that produces agentic PDFs (e.g. `agentic-pdf print`).
+- **Generator** — any tool that produces agentic PDFs. The reference CLI
+  provides `agentic-pdf agentify` (fully automatic extraction) and
+  `agentic-pdf print` (embedding a manually authored layer).
 
 ## 3. Layer composition
 
