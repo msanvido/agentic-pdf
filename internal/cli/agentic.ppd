@@ -1,0 +1,44 @@
+*PPD-Adobe: "4.3"
+*FormatVersion: "4.3"
+*FileVersion: "1.0"
+*PSVersion: "(3010) 1"
+*LanguageEncoding: ISOLatin1
+*LanguageVersion: English
+*Manufacturer: "agentic-pdf"
+*ModelName: "Agentic PDF Printer"
+*ShortNickName: "Agentic PDF Printer"
+*NickName: "Agentic PDF Printer (agent-readable layer embedded)"
+*PCFileName: "AGENTIC.PPD"
+*Product: "(Agentic PDF Printer)"
+*ColorDevice: True
+*DefaultColorSpace: RGB
+*FileSystem: False
+*TTRasterizer: Type42
+*VariablePaperSize: True
+*Throughput: "1"
+*FreeVM: "32000000"
+
+*OpenUI *PageSize/Media Size: PickOne
+*DefaultPageSize: A4
+*PageSize A4/A4: "<</PageSize[595.04 841.88]>>setpagedevice"
+*PageSize Letter/Letter: "<</PageSize[612 792]>>setpagedevice"
+*CloseUI: *PageSize
+
+*OpenUI *PageRegion/Media Source: PickOne
+*DefaultPageRegion: A4
+*PageRegion A4/A4: "<</PageSize[595.04 841.88]>>setpagedevice"
+*PageRegion Letter/Letter: "<</PageSize[612 792]>>setpagedevice"
+*CloseUI: *PageRegion
+
+*DefaultImageableArea: A4
+*ImageableArea A4/A4: "0 0 595.04 841.88"
+*ImageableArea Letter/Letter: "0 0 612 792"
+
+*DefaultPaperDimension: A4
+*PaperDimension A4/A4: "595.04 841.88"
+*PaperDimension Letter/Letter: "612 792"
+
+*% Pass the PDF spool through untouched: the agentic-pdf backend
+*% consumes PDFs directly. Other input formats are converted to PDF
+*% by the standard CUPS filter chain before reaching this point.
+*cupsFilter: "application/vnd.cups-pdf 0 -"

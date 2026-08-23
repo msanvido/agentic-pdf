@@ -1,6 +1,7 @@
 package cli
 
 import (
+	_ "embed"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -8,6 +9,9 @@ import (
 	"runtime"
 	"strings"
 )
+
+//go:embed agentic.ppd
+var agenticPPD string
 
 func toJSON(v any) string {
 	b, _ := json.MarshalIndent(v, "", "  ")
@@ -50,12 +54,17 @@ func InstallBackend(spool string) error {
 	if owner != "" && owner != "root" {
 		run("sudo", "chown", owner, spool)
 	}
-	// Raw queue: macOS hands the app's PDF spool directly to the backend,
-	// with no PostScript filtering in between. (PPD-based queues would
-	// deliver PostScript we cannot re-process, and PPDs are deprecated.)
+	// Custom pass-through PPD: CUPS converts any incoming format to PDF,
+	// then hands the PDF to our backend untouched (the "-" filter). Raw
+	// queues are no longer supported on macOS, and PPD-based queues would
+	// otherwise deliver PostScript we cannot re-process.
+	ppd := "/tmp/agentic-pdf.ppd"
+	if err := os.WriteFile(ppd, []byte(agenticPPD), 0o644); err != nil {
+		return err
+	}
 	run("sudo", "lpadmin", "-p", "AgenticPDF",
 		"-v", "agentpdf:"+spool,
-		"-m", "raw",
+		"-P", ppd,
 		"-D", "Agentic PDF Printer")
 	// A single backend failure must not stop the queue.
 	run("sudo", "lpadmin", "-p", "AgenticPDF",
