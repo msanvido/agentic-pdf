@@ -183,13 +183,7 @@ else
   cat > "$tmp_in"
 fi
 
-magic=$(head -c 4 "$tmp_in" 2>/dev/null)
-if [ "$magic" != "%PDF" ]; then
-  say "job $job_id: rejected non-PDF input"
-  rm -f "$tmp_in"
-  exit 1
-fi
-
+# Forward everything to the receiver; it does validation and logging.
 rc=$(curl -s --max-time 120 \
       -H "X-Job-Id: $job_id" \
       -H "X-Job-Title: $title" \

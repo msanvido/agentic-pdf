@@ -42,6 +42,19 @@ func Receive(port int, outDir string) error {
 		if title == "" {
 			title = "Untitled"
 		}
+		// Diagnose payloads that are not PDFs (PostScript, text, …) instead
+		// of failing blindly — visible in /tmp/agentic-pdf-receive.log.
+		if len(body) < 5 || string(body[:4]) != "%PDF" {
+			preview := body
+			if len(preview) > 60 {
+				preview = preview[:60]
+			}
+			fmt.Fprintf(os.Stderr,
+				"⚠️  job %q: non-PDF payload (%d bytes, %q…)\n",
+				r.Header.Get("X-Job-Id"), len(body), preview)
+			http.Error(w, "non-PDF payload", http.StatusUnsupportedMediaType)
+			return
+		}
 		out, err := receiveConvert(body, outDir, title)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "⚠️  job failed: %v\n", err)
