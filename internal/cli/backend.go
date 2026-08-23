@@ -50,11 +50,12 @@ func InstallBackend(spool string) error {
 	if owner != "" && owner != "root" {
 		run("sudo", "chown", owner, spool)
 	}
-	// Generic PPD: without a model attached, the macOS print dialog rejects
-	// the queue with "Something went wrong when trying to print".
+	// Raw queue: macOS hands the app's PDF spool directly to the backend,
+	// with no PostScript filtering in between. (PPD-based queues would
+	// deliver PostScript we cannot re-process, and PPDs are deprecated.)
 	run("sudo", "lpadmin", "-p", "AgenticPDF",
 		"-v", "agentpdf:"+spool,
-		"-m", "drv:///sample.drv/generic.ppd",
+		"-m", "raw",
 		"-D", "Agentic PDF Printer")
 	// A single backend failure must not stop the queue.
 	run("sudo", "lpadmin", "-p", "AgenticPDF",
@@ -107,6 +108,15 @@ if [ -n "$file" ] && [ -r "$file" ]; then
   cp "$file" "$tmp_in" || { log "job $job_id: cannot copy spool file"; exit 1; }
 else
   cat > "$tmp_in"
+fi
+
+# Only PDFs are supported (GUI printing always spools PDF). Anything else
+# would make the CLI re-enter cupsfilter and deadlock against this very job.
+if [ "$(head -c 5 "$tmp_in")" != "%PDF-" ]; then
+  kind=$(file -b "$tmp_in" 2>/dev/null | cut -c1-40)
+  log "job $job_id: rejected non-PDF input ($kind)"
+  rm -f "$tmp_in"
+  exit 1
 fi
 
 safe_title=$(printf '%s' "$title" | tr '/:' '__' | cut -c1-80)

@@ -2,21 +2,23 @@ package core
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 	"unicode"
 
 	"github.com/ledongthuc/pdf"
 )
 
 type WordPos struct {
-	S      string  // text fragment
-	X, Y   float64 // position in points (X left→right, Y bottom→top)
-	W      float64 // rendered width
+	S    string  // text fragment
+	X, Y float64 // position in points (X left→right, Y bottom→top)
+	W    float64 // rendered width
 }
 
 type PageText struct {
@@ -238,9 +240,17 @@ func cupsFilterToPDF(inputPath string) ([]byte, error) {
 	if cmd == nil {
 		return nil, fmt.Errorf("cupsfilter not found: cannot convert %q to PDF; provide a PDF instead", inputPath)
 	}
+	// Never hang forever: cupsfilter can deadlock when invoked from within a
+	// CUPS backend while cupsd is busy with our own job.
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+	cmd = exec.CommandContext(ctx, cmd.Path, cmd.Args[1:]...)
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	out, err := cmd.Output()
+	if ctx.Err() == context.DeadlineExceeded {
+		return nil, fmt.Errorf("converting %q timed out after 60s", inputPath)
+	}
 	if err != nil {
 		detail := strings.TrimSpace(stderr.String())
 		if detail == "" {
