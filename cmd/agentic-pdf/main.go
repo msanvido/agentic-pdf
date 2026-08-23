@@ -15,19 +15,14 @@ func help() string {
 	return `agentic-pdf v` + version + ` — PDF printer driver + viewer with a hidden agent-readable layer
 
 Usage:
-  agentic-pdf print <input> [-o out.pdf] [--title "T"] [--canonical URL] [--no-html]
-      Convert any printable file to a PDF and embed the hidden agentic layer
-      (agent.md / agent.html attachments). PDFs are used as-is.
+  agentic-pdf agentify <input> [-o out.pdf] [--title "T"] [--author "A"] [--canonical URL] [--no-html]
+      Extract everything automatically (text, tables, figures, metadata)
+      using the best available extraction tools, and embed the agent layer.
+      Works on PDFs and any cupsfilter-convertible input.
 
-  agentic-pdf read <file.pdf> [--raw | --html | --meta]
-      Extract and display the hidden agentic layer.
-        (default)   markdown without frontmatter
-        --raw       raw markdown exactly as embedded (pipe-friendly for agents)
-        --html      rendered HTML
-        --meta      metadata + frontmatter as JSON
-
-  agentic-pdf view <file.pdf> [--port 4173] [--no-browser]
-      Serve the viewer at http://localhost:<port>/?file=doc.pdf
+  agentic-pdf print <input.pdf> --md agent.md [--html agent.html]
+      [--attach file ...] [-o out.pdf] [--title "T"] [--canonical URL]
+      Embed a MANUALLY authored agent layer. No extraction happens.
 
   agentic-pdf check <file.pdf>
       Exit 0 and print a summary if the file carries an agentic layer.
@@ -65,6 +60,8 @@ func main() {
 	switch args[0] {
 	case "print":
 		err = cmdPrint(args[1:])
+	case "agentify":
+		err = cmdAgentify(args[1:])
 	case "read":
 		err = cmdRead(args[1:])
 	case "view":
@@ -96,13 +93,59 @@ func main() {
 	}
 }
 
-// flags: -o/--out VAL, --title VAL, --canonical VAL, --no-html
-func cmdPrint(args []string) error {
+func cmdAgentify(args []string) error {
 	input := ""
 	out := ""
 	title := ""
+	author := ""
 	canonical := ""
 	noHTML := false
+	for i := 0; i < len(args); i++ {
+		switch args[i] {
+		case "-o", "--out":
+			i++
+			if i >= len(args) {
+				return fmt.Errorf("agentify: %s needs a value", args[i-1])
+			}
+			out = args[i]
+		case "--title":
+			i++
+			if i >= len(args) {
+				return fmt.Errorf("agentify: --title needs a value")
+			}
+			title = args[i]
+		case "--author":
+			i++
+			if i >= len(args) {
+				return fmt.Errorf("agentify: --author needs a value")
+			}
+			author = args[i]
+		case "--canonical":
+			i++
+			if i >= len(args) {
+				return fmt.Errorf("agentify: --canonical needs a value")
+			}
+			canonical = args[i]
+		case "--no-html":
+			noHTML = true
+		default:
+			input = args[i]
+		}
+	}
+	if input == "" {
+		return fmt.Errorf("agentify: missing <input>")
+	}
+	return cli.Agentify(input, out, title, author, canonical, !noHTML)
+}
+
+func cmdPrint(args []string) error {
+	input := ""
+	out := ""
+	mdFile := ""
+	htmlFile := ""
+	title := ""
+	canonical := ""
+	var attaches []string
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
 		case "-o", "--out":
@@ -111,6 +154,24 @@ func cmdPrint(args []string) error {
 				return fmt.Errorf("print: %s needs a value", args[i-1])
 			}
 			out = args[i]
+		case "--md":
+			i++
+			if i >= len(args) {
+				return fmt.Errorf("print: --md needs a value")
+			}
+			mdFile = args[i]
+		case "--html":
+			i++
+			if i >= len(args) {
+				return fmt.Errorf("print: --html needs a value")
+			}
+			htmlFile = args[i]
+		case "--attach":
+			i++
+			if i >= len(args) {
+				return fmt.Errorf("print: --attach needs a value")
+			}
+			attaches = append(attaches, args[i])
 		case "--title":
 			i++
 			if i >= len(args) {
@@ -123,8 +184,6 @@ func cmdPrint(args []string) error {
 				return fmt.Errorf("print: --canonical needs a value")
 			}
 			canonical = args[i]
-		case "--no-html":
-			noHTML = true
 		default:
 			input = args[i]
 		}
@@ -132,7 +191,7 @@ func cmdPrint(args []string) error {
 	if input == "" {
 		return fmt.Errorf("print: missing <input>")
 	}
-	return cli.Print(input, out, title, canonical, !noHTML)
+	return cli.Print(input, out, mdFile, htmlFile, attaches, title, canonical)
 }
 
 func cmdRead(args []string) error {

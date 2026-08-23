@@ -199,13 +199,16 @@ endtrailer
   <p class="muted">Produce a conforming document with:</p>
   <pre><code><span class="c"># print any convertible file into an agentic PDF — everything is
 # extracted automatically from the raw data; no flags needed:</span>
-agentic-pdf print docs/demo/report.txt -o report.pdf
+agentic-pdf agentify docs/demo/report.txt -o report.pdf
 
 <span class="c"># real-world stress test: a 77-page Federal Reserve report full of charts</span>
-agentic-pdf print docs/demo/fed-monetary-policy-report-july-2026.pdf
+agentic-pdf agentify docs/demo/fed-monetary-policy-report-july-2026.pdf
 
 <span class="c"># chart + table demo: table becomes markdown, figure caption is preserved</span>
-agentic-pdf print docs/demo/acme-q2-results.pdf
+agentic-pdf agentify docs/demo/acme-q2-results.pdf
+
+<span class="c"># authored the layer yourself? embed it without extraction:</span>
+agentic-pdf print contract.pdf --md my-agent.md
 
 <span class="c"># verify the layer</span>
 agentic-pdf check report.pdf

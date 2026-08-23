@@ -41,17 +41,28 @@ make cross            # static builds: darwin/linux/windows × amd64/arm64 → d
 
 ## Usage
 
-### Print
+### Agentify (automatic)
 
-Everything (title, summary, timestamps, canonical source) is extracted
-automatically from the raw data. Sample inputs live in [`docs/demo/`](docs/demo/):
+Extracts text, tables, figure captions and metadata from the source using the
+best available tools — poppler's `pdftotext -bbox-layout` when installed
+(`brew install poppler`), with a built-in Go extractor as fallback. Sample
+inputs live in [`docs/demo/`](docs/demo/):
 
 ```bash
-agentic-pdf print docs/demo/report.txt -o report.pdf    # rich 2-page business report
-agentic-pdf print docs/demo/memo.txt -o memo.pdf        # internal memo
-agentic-pdf print docs/demo/fed-monetary-policy-report-july-2026.pdf   # real 77-page Fed report (charts)
-agentic-pdf print docs/demo/sample.txt --title "Q3 Report" --canonical https://example.com/q3
-agentic-pdf check report.pdf                       # verify the layer (exit 0 = present)
+agentic-pdf agentify docs/demo/report.txt -o report.pdf   # rich 2-page report
+agentic-pdf agentify docs/demo/memo.txt -o memo.pdf       # internal memo
+agentic-pdf agentify docs/demo/acme-q2-results.pdf        # pie chart + table demo
+agentic-pdf agentify docs/demo/fed-monetary-policy-report-july-2026.pdf  # 77-page Fed report
+
+agentic-pdf check report.pdf                              # verify (exit 0 = layer present)
+```
+
+### Print (manual layer)
+
+Embed a hand-authored agent layer — no extraction happens:
+
+```bash
+agentic-pdf print contract.pdf --md my-agent.md --attach terms.md -o out.pdf
 ```
 
 ### Read the agent layer

@@ -10,13 +10,15 @@ import (
 	"github.com/msanvido/agentic-pdf/internal/core"
 )
 
-// Print converts an input file to an agentic PDF (embeds the hidden layer).
-func Print(input, output, title, canonical string, withHTML bool) error {
+// Agentify automatically extracts everything from the source document
+// (text, tables, figures, metadata) using the best available extraction
+// tools, and embeds the generated agent layer.
+func Agentify(input, output, title, author, canonical string, withHTML bool) error {
 	if output == "" {
 		ext := filepath.Ext(input)
 		output = input[:len(input)-len(ext)] + ".agentic.pdf"
 	}
-	fmt.Fprintf(os.Stderr, "⏳ printing %s → %s\n", input, output)
+	fmt.Fprintf(os.Stderr, "⏳ agentifying %s → %s\n", input, output)
 
 	pdfBytes, err := core.ToPdf(input)
 	if err != nil {
@@ -26,11 +28,14 @@ func Print(input, output, title, canonical string, withHTML bool) error {
 	// Carry over the original PDF's own metadata where the command didn't
 	// provide anything: an existing Info-dict Title beats a text-based guess.
 	var existingAuthor string
-	if info, ierr := core.ReadPDFInfo(pdfBytes); ierr == nil {
+	if info, ierr := core.ReadPDFInfo(pdfBytes); ierr == nil && info != nil {
 		if title == "" {
 			title = info.Title
 		}
 		existingAuthor = info.Author
+	}
+	if author == "" {
+		author = existingAuthor
 	}
 
 	if canonical == "" {
@@ -38,11 +43,12 @@ func Print(input, output, title, canonical string, withHTML bool) error {
 			canonical = "file://" + abs
 		}
 	}
-	pages, err := core.ExtractPages(pdfBytes)
+
+	pages, err := core.ExtractPagesAuto(input, pdfBytes)
 	if err != nil {
 		return err
 	}
-	result, err := core.InjectAgentLayer(pdfBytes, pages, title, existingAuthor, "", canonical, "", withHTML)
+	result, err := core.InjectAgentLayer(pdfBytes, pages, title, author, "", canonical, "", withHTML)
 	if err != nil {
 		return err
 	}
@@ -50,6 +56,43 @@ func Print(input, output, title, canonical string, withHTML bool) error {
 		return err
 	}
 	fmt.Fprintf(os.Stderr, "✅ wrote %s (%d page(s), agentic layer embedded)\n", output, len(pages))
+	return nil
+}
+
+// Print embeds user-provided agent markdown (and optional extra attachments)
+// into a PDF manually — no automatic extraction.
+func Print(input, output, mdFile, htmlFile string, attaches []string, title, canonical string) error {
+	if output == "" {
+		ext := filepath.Ext(input)
+		output = input[:len(input)-len(ext)] + ".print.pdf"
+	}
+	if mdFile == "" && htmlFile == "" && len(attaches) == 0 {
+		return fmt.Errorf("print: nothing to embed — pass --md <file.md> (or --html/--attach); " +
+			"did you mean 'agentify', which extracts the layer automatically?")
+	}
+	fmt.Fprintf(os.Stderr, "⏳ printing %s → %s\n", input, output)
+
+	pdfBytes, err := core.ToPdf(input)
+	if err != nil {
+		return err
+	}
+
+	var mdContent []byte
+	if mdFile != "" {
+		mdContent, err = os.ReadFile(mdFile)
+		if err != nil {
+			return err
+		}
+	}
+
+	result, err := core.InjectCustom(pdfBytes, mdContent, attaches, title, canonical)
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(output, result, 0o644); err != nil {
+		return err
+	}
+	fmt.Fprintf(os.Stderr, "✅ wrote %s (custom agent layer embedded)\n", output)
 	return nil
 }
 
@@ -149,7 +192,7 @@ func DebugTables(input string) error {
 	if err != nil {
 		return err
 	}
-	pages, err := core.ExtractPages(data)
+	pages, err := core.ExtractPagesAuto(input, data)
 	if err != nil {
 		return err
 	}

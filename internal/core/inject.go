@@ -10,6 +10,7 @@ import (
 
 	"github.com/pdfcpu/pdfcpu/pkg/api"
 	"github.com/pdfcpu/pdfcpu/pkg/pdfcpu/model"
+	"github.com/pdfcpu/pdfcpu/pkg/pdfcpu/types"
 )
 
 // InjectAgentLayer embeds the agentic layer into a PDF:
@@ -213,4 +214,87 @@ func ReadPDFInfo(pdfBytes []byte) (*PDFDocInfo, error) {
 		return nil, err
 	}
 	return &PDFDocInfo{Title: info.Title, Author: info.Author}, nil
+}
+
+// InjectCustom embeds a user-provided agent markdown (and any extra
+// attachments) without generating anything. Spec Info markers are still set.
+// If no markdown is given but attachments are provided, only those are
+// embedded. If neither is present, callers should not call this.
+func InjectCustom(pdfBytes []byte, mdContent []byte, attachPaths []string, title, canonical string) ([]byte, error) {
+	conf := model.NewDefaultConfiguration()
+	cleaned := stripEmbeddedFiles(pdfBytes)
+
+	var files []string
+	tmpDir := ""
+	if len(mdContent) > 0 {
+		dir, err := os.MkdirTemp("", "agentic-print-")
+		if err != nil {
+			return nil, err
+		}
+		defer os.RemoveAll(dir)
+		tmpDir = dir
+		mdPath := filepath.Join(tmpDir, AgentMD)
+		if err := os.WriteFile(mdPath, mdContent, 0o644); err != nil {
+			return nil, err
+		}
+		files = append(files, mdPath)
+	}
+	files = append(files, attachPaths...)
+
+	var out bytes.Buffer
+	if len(files) > 0 {
+		if err := api.AddAttachments(bytes.NewReader(cleaned), &out, files, true, conf); err != nil {
+			return nil, fmt.Errorf("attaching: %w", err)
+		}
+	} else {
+		out.Write(cleaned)
+	}
+
+	props := map[string]string{InfoKey: InfoValue}
+	if title != "" {
+		props["Title"] = title
+	}
+	if canonical != "" {
+		props[CanonicalKey] = canonical
+	}
+	var out2 bytes.Buffer
+	if err := api.AddProperties(bytes.NewReader(out.Bytes()), &out2, props, conf); err != nil {
+		return nil, fmt.Errorf("setting properties: %w", err)
+	}
+	return out2.Bytes(), nil
+}
+
+// stripEmbeddedFiles removes the EmbeddedFiles name tree and catalog /AF
+// array at the object level. Best effort: on any failure the original bytes
+// are returned unchanged.
+func stripEmbeddedFiles(pdfBytes []byte) (out []byte) {
+	defer func() {
+		if p := recover(); p != nil {
+			out = pdfBytes
+		}
+	}()
+	ctx, err := api.ReadContext(bytes.NewReader(pdfBytes), nil)
+	if err != nil {
+		return pdfBytes
+	}
+	root := ctx.RootDict
+	if root == nil {
+		return pdfBytes
+	}
+	if namesObj, found := root.Find("Names"); found {
+		if names, ok := namesObj.(types.Dict); ok {
+			names.Delete("EmbeddedFiles")
+			if len(names) == 0 {
+				root.Delete("Names")
+			}
+		} else {
+			root.Delete("Names")
+		}
+	}
+	root.Delete("AF")
+	var buf bytes.Buffer
+	if err := api.WriteContext(ctx, &buf); err != nil {
+		return pdfBytes
+	}
+	return buf.Bytes()
 }
