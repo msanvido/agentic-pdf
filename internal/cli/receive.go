@@ -80,23 +80,18 @@ func Receive(port int, outDir string) error {
 	fmt.Printf("📥 receiver listening on %s\n   output: %s\n   inbox:  /tmp/agentic-pdf-inbox\n", addr, outDir)
 
 	// Poll the CUPS-backend inbox: the sandboxed backend drops spooled PDFs
-	// there (network is denied inside the sandbox, filesystem writes to /tmp
-	// are not).
-	const inbox = "/tmp/agentic-pdf-inbox"
-	_ = os.MkdirAll(inbox, 0o777)
+	// as /tmp/agentpdf.<jobid>.<title>.XXXXXX.pdf (mktemp-style creation is
+	// the only write primitive the sandbox allows; network is denied).
 	go func() {
 		for {
-			entries, _ := os.ReadDir(inbox)
-			for _, e := range entries {
-				path := filepath.Join(inbox, e.Name())
-				if strings.HasSuffix(path, ".title") {
-					continue
+			matches, _ := filepath.Glob("/tmp/agentpdf.*.pdf")
+			for _, path := range matches {
+				claimed := path + ".claim"
+				if err := os.Rename(path, claimed); err != nil {
+					continue // another receiver claimed it
 				}
-				if processInboxFile(path, outDir) {
-					os.Remove(path)
-					titlePath := strings.TrimSuffix(path, ".pdf") + ".title"
-					os.Remove(titlePath)
-				}
+				processInboxFile(claimed, outDir)
+				os.Remove(claimed)
 			}
 			time.Sleep(time.Second)
 		}
@@ -106,44 +101,48 @@ func Receive(port int, outDir string) error {
 }
 
 // processInboxFile converts one spooled PDF; returns true when handled.
-func processInboxFile(path, outDir string) bool {
+// Title is embedded in the filename: agentpdf.<jobid>.<title>.<rand>.pdf
+func processInboxFile(path, outDir string) {
 	data, err := os.ReadFile(path)
 	if err != nil || len(data) < 5 || string(data[:4]) != "%PDF" {
-		return false // not ours / still being written / unreadable
+		return // not ours / unreadable
 	}
-	titleBytes, _ := os.ReadFile(strings.TrimSuffix(path, ".pdf") + ".title")
-	title := strings.TrimSpace(string(titleBytes))
-	fmt.Fprintf(os.Stderr, "[debug] inbox=%s titleBytes=%d title=%q\n", path, len(titleBytes), title)
-	if title == "" {
-		// Title sidecar may land a moment after the data file; retry once.
-		time.Sleep(400 * time.Millisecond)
-		titleBytes, _ = os.ReadFile(strings.TrimSuffix(path, ".pdf") + ".title")
-		title = strings.TrimSpace(string(titleBytes))
+	base := filepath.Base(path)
+	title := "Printed document"
+	// agentpdf.<jobid>.<title...>.<6-10 rand>.pdf
+	// claimed files carry an extra ".claim" suffix; drop it plus ".pdf",
+	// leaving agentpdf.<jobid>.<title...>.<rand>
+	rest := strings.TrimSuffix(strings.TrimSuffix(base, ".claim"), ".pdf")
+	rest = strings.TrimPrefix(rest, "agentpdf.")
+	parts := strings.Split(rest, ".")
+	if len(parts) >= 3 {
+		title = strings.Join(parts[1:len(parts)-1], ".") // drop jobid + rand
 	}
+	title = strings.TrimSpace(title)
 	if title == "" {
 		title = "Printed document"
 	}
 	pages, err := core.ExtractPages(data)
 	if err != nil {
-		return false // maybe still being written; retry next tick
+		fmt.Fprintf(os.Stderr, "⚠️  %s: %v\n", filepath.Base(path), err)
+		return
 	}
 	result, err := core.InjectAgentLayer(data, pages, title, "", "", "", true)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "⚠️  %s: %v\n", filepath.Base(path), err)
-		return true // don't loop forever on broken files
+		return
 	}
 	name := fmt.Sprintf("%s (printed).pdf", title)
 	out := filepath.Join(outDir, name)
 	tmp := out + ".part"
 	if err := os.WriteFile(tmp, result, 0o644); err != nil {
-		return false
+		return
 	}
 	if err := os.Rename(tmp, out); err != nil {
-		return false
+		return
 	}
 	fmt.Fprintf(os.Stderr, "✅ printed → %s\n", out)
 	notifyUser("Agentic PDF ready", filepath.Base(out))
-	return true
 }
 
 var spacesRE = regexp.MustCompile(`\s+`)

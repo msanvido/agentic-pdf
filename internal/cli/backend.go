@@ -191,36 +191,22 @@ say() {
   logger -t agentpdf "$*" 2>/dev/null
 }
 
-INBOX=/tmp/agentic-pdf-inbox
-mkdir -p "$INBOX" 2>/dev/null || exit 1
+# Only the mktemp-style file primitive is guaranteed writable inside the
+# cupsd sandbox, so the payload lands as /tmp/agentpdf.<jobid>.<title>.XXXXXX.pdf
+# and the user-space receiver picks up that glob.
+safe_title=$(printf '%s' "$title" | tr '/:' '__' | tr -c '[:alnum:]. _-' '_' | cut -c1-60)
 
-# The sandbox denies network access, so instead of connecting anywhere we
-# drop the spooled PDF into a world-readable inbox. The user-space receiver
-# ('agentic-pdf receive') polls it every second and does conversion +
-# delivery with normal user permissions.
-
+tmp_in=$(mktemp "/tmp/agentpdf.${job_id}.${safe_title}.XXXXXX") || {
+  say "job $job_id: cannot create temp file"; exit 1
+}
 if [ -n "$file" ] && [ -r "$file" ]; then
-  src="$file"
+  cat "$file" > "$tmp_in"
 else
-  src="-"   # job data arrives on stdin
+  cat > "$tmp_in"
 fi
-
-data="$INBOX/job-$job_id.pdf"
-title_file="$INBOX/job-$job_id.pdf.title"
-
-# Write the title sidecar BEFORE the data file: the receiver processes as
-# soon as the .pdf appears.
-printf '%s' "$title" > "$title_file" 2>/dev/null
-chmod 644 "$title_file" 2>/dev/null
-
-if [ "$src" = "-" ]; then
-  cat > "$data.tmp" || { say "job $job_id: cannot read stdin"; exit 1; }
-else
-  cat "$src" > "$data.tmp" || { say "job $job_id: cannot copy spool file"; exit 1; }
-fi
-chmod 644 "$data.tmp" 2>/dev/null
-mv "$data.tmp" "$data"
-say "job $job_id: dropped $data"
+chmod 644 "$tmp_in" 2>/dev/null
+mv "$tmp_in" "$tmp_in.pdf" 2>/dev/null   # .pdf extension = ready flag
+say "job $job_id: dropped ${tmp_in}.pdf"
 
 echo "READY"
 exit 0
