@@ -102,6 +102,9 @@ in the output folder with an embedded agent-readable layer.
 
 func installReceiveAgent(exe string, port int, spool string) error {
 	plist := receivePlistPath()
+	// Stage via /tmp and copy with sudo: a root-owned plist in the user's
+	// LaunchAgents dir makes launchd reject it (EX_CONFIG).
+	tmpPlist := "/tmp/agentic-pdf-receive.plist"
 	content := fmt.Sprintf(`<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -122,7 +125,17 @@ func installReceiveAgent(exe string, port int, spool string) error {
 </dict>
 </plist>
 `, receiveLabel, exe, port, spool, spool)
-	if err := os.WriteFile(plist, []byte(content), 0o644); err != nil {
+	if err := os.WriteFile(tmpPlist, []byte(content), 0o644); err != nil {
+		return err
+	}
+	owner := os.Getenv("SUDO_USER")
+	if owner == "" || owner == "root" {
+		owner = os.Getenv("USER")
+	}
+	if owner != "" {
+		run("sudo", "cp", tmpPlist, plist)
+		run("sudo", "chown", owner, plist)
+	} else if err := os.WriteFile(plist, []byte(content), 0o644); err != nil {
 		return err
 	}
 	tryRun("launchctl", "unload", plist)

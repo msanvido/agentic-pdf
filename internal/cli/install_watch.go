@@ -110,8 +110,17 @@ func installWatchMac(exe, spool, outDir string) error {
 </dict>
 </plist>
 `, macPlistLabel, exe, spool, spool, outDir)
-	if err := os.WriteFile(plist, []byte(content), 0o644); err != nil {
+	tmp := "/tmp/agentic-pdf-watch.plist"
+	if err := os.WriteFile(tmp, []byte(content), 0o644); err != nil {
 		return err
+	}
+	owner := os.Getenv("SUDO_USER")
+	if owner == "" || owner == "root" {
+		owner = os.Getenv("USER")
+	}
+	run("sudo", "cp", tmp, plist)
+	if owner != "" && owner != "root" {
+		run("sudo", "chown", owner, plist)
 	}
 	tryRun("launchctl", "unload", plist)
 	if err := exec.Command("launchctl", "load", plist).Run(); err != nil {
