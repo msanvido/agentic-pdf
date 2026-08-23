@@ -112,9 +112,9 @@
     entirely.
   </div>
 
-  <pre><code>Today:   PDF ──▶ OCR / vision model ──▶ cleanup &amp; repair ──▶ LLM   <span class="c">(per page, every time)</span>
+  <pre><code>Today:   Raw content (missing from legacy PDF) -&gt; OCR / vision model -&gt; cleanup &amp; repair -&gt; LLM   <span class="c">(per page, every time)</span>
 
-Agentic: PDF ──▶ extract agent.md ────────────────────────▶ LLM   <span class="c">(free, exact, instant)</span></code></pre>
+Agentic: Raw content -&gt; PDF + agent.md -&gt; LLM   <span class="c">(free, exact, instant)</span></code></pre>
 
   <div class="grid2">
     <div class="card"><span class="icon">👁</span><h3>Invisible to humans</h3><p>The agent layer uses standard PDF EmbeddedFiles. Nothing renders on any page; Preview, Acrobat, and every printer output look unchanged.</p></div>
