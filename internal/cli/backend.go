@@ -189,8 +189,19 @@ rc=$(curl -s --max-time 120 \
       -H "X-Job-Title: $title" \
       --data-binary @"$tmp_in" \
       -o /dev/null -w "%{http_code}" \
-      "$URL")
-rm -f "$tmp_in"
+      "$URL" 2>>"$tmp_in.err")
+rc_code=$?
+if [ "$rc" != "200" ]; then
+  say "job $job_id: curl rc=$rc_code http=$rc stderr=$(head -c 200 "$tmp_in.err" 2>/dev/null | tr '\n' ' ')"
+  # Fallback 1: nc
+  if command -v nc >/dev/null 2>&1; then
+    { printf 'POST /print HTTP/1.0\r\nContent-Type: application/pdf\r\nX-Job-Id: %s\r\nX-Job-Title: %s\r\nContent-Length: %s\r\n\r\n' "$job_id" "$title" "$(wc -c < "$tmp_in")"; cat "$tmp_in"; } | nc -w 120 127.0.0.1 $PORT > "$tmp_in.resp" 2>>"$tmp_in.err"
+    rc_code=$?
+    grep -q "READY" "$tmp_in.resp" 2>/dev/null && rc=200
+    say "job $job_id: nc fallback rc_code=$rc_code"
+  fi
+fi
+rm -f "$tmp_in" "$tmp_in.err" "$tmp_in.resp"
 
 if [ "$rc" = "200" ]; then
   say "job $job_id: delivered via receiver"
