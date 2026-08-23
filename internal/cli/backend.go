@@ -126,7 +126,10 @@ job_id="$1"; user="$2"; title="$3"; copies="$4"; options="$5"; file="$6"
 SPOOL_DIR="` + spool + `"
 STAGE="/var/spool/cups/agentic-pdf"
 
-say() { logger -t agentpdf "$*"; }
+say() {
+  echo "agentpdf: $*" >&2          # -> /var/log/cups/error_log (readable for debugging)
+  logger -t agentpdf "$*" 2>/dev/null
+}
 say "job $job_id: title='$title' file='$file'"
 
 mkdir -p "$STAGE" 2>/dev/null || { say "job $job_id: cannot create $STAGE"; exit 1; }
