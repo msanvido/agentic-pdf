@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 
 	"github.com/msanvido/agentic-pdf/internal/core"
@@ -60,7 +61,7 @@ func InstallBackend(spool string) error {
 	}
 
 	// 2. Backend + filter + queue (root-owned locations).
-	script := buildBackendScript(exe, port)
+	script := buildBackendScript(port)
 	tmpScript := "/tmp/agentic-pdf-backend-agentpdf"
 	if err := os.WriteFile(tmpScript, []byte(script), 0o755); err != nil {
 		return err
@@ -169,18 +170,18 @@ func UninstallBackend() error {
 	return nil
 }
 
-func buildBackendScript(cliPath string, port int) string {
+func buildBackendScript(port int) string {
 	return `#!/bin/sh
 # CUPS backend for agentic-pdf.
 #
-# cupsd runs backends inside a sandbox that denies nearly all filesystem
-# writes, so this script simply hands the (already PDF) spool to the
-# user-space receiver over localhost HTTP. The receiver does the actual
-# conversion and delivery with normal user permissions.
+# The cupsd sandbox denies filesystem writes and (historically) flaky exec
+# of user binaries, but ALLOWS outbound network. Primary path: POST the PDF
+# spool to the user-space receiver over localhost. Fallback: shell
+# redirection into /var/tmp/agentic-pdf-inbox (probed as writable).
 
 # Discovery (no args): advertise the device.
 if [ $# -eq 0 ]; then
-  echo "network agentpdf \"Agentic PDF Printer\" \"Prints to agentic PDFs with an embedded agent-readable layer\""
+  echo "network agentpdf \\"Agentic PDF Printer\\" \\"Prints to agentic PDFs with an embedded agent-readable layer\\""
   exit 0
 fi
 
@@ -191,40 +192,25 @@ say() {
   logger -t agentpdf "$*" 2>/dev/null
 }
 
-# --- capability probe (temporary diagnostics) -------------------------
-probe() { # $1=label $2=command
-  out=$($2 2>&1); r=$?
-  say "probe $1: rc=$r out=$out"
-}
-probe "mktemp-tmp"     "mktemp /tmp/probe.XXXXXX"
-probe "mkdir-vartmp"   "mkdir -p /var/tmp/agentic-probe"
-probe "write-vartmp"   "echo x > /var/tmp/agentic-probe/f"
-probe "nc-localhost"   "echo ping | nc -w 2 -G 2 127.0.0.1 ${port} "
-probe "curl-localhost" "curl -s -m 3 -o /dev/null -w '%{http_code}' http://127.0.0.1:${port}/health"
-probe "exec-cli"       "` + cliPath + ` --version"
-# ----------------------------------------------------------------------
-
-say() {
-  echo "agentpdf: $*" >&2          # -> /var/log/cups/error_log
-  logger -t agentpdf "$*" 2>/dev/null
-}
-
-# Only the mktemp-style file primitive is guaranteed writable inside the
-# cupsd sandbox, so the payload lands as /tmp/agentpdf.<jobid>.<title>.XXXXXX.pdf
-# and the user-space receiver picks up that glob.
-safe_title=$(printf '%s' "$title" | tr '/:' '__' | tr -c '[:alnum:]. _-' '_' | cut -c1-60)
-
-tmp_in=$(mktemp "/tmp/agentpdf.${job_id}.${safe_title}.XXXXXX") || {
-  say "job $job_id: cannot create temp file"; exit 1
-}
-if [ -n "$file" ] && [ -r "$file" ]; then
-  cat "$file" > "$tmp_in"
-else
-  cat > "$tmp_in"
+# Primary: POST to the receiver. Job data arrives on stdin.
+rc=$(curl -s --max-time 120 \
+      -H "X-Job-Id: $job_id" \
+      -H "X-Job-Title: $title" \
+      --data-binary @- \
+      -o /dev/null -w "%{http_code}" \
+      "http://127.0.0.1:` + strconv.Itoa(port) + `/print")
+if [ "$rc" = "200" ]; then
+  say "job $job_id: delivered via receiver"
+  echo "READY"
+  exit 0
 fi
-chmod 644 "$tmp_in" 2>/dev/null
-mv "$tmp_in" "$tmp_in.pdf" 2>/dev/null   # .pdf extension = ready flag
-say "job $job_id: dropped ${tmp_in}.pdf"
+say "job $job_id: receiver unreachable (HTTP $rc) - dropping to fallback inbox"
+
+# Fallback: shell redirection to /var/tmp works inside the sandbox.
+fallback="/var/tmp/agentic-pdf-inbox/job-${job_id}.pdf"
+cat > "$fallback" 2>/dev/null || { say "job $job_id: fallback write failed"; exit 1; }
+chmod 666 "$fallback" 2>/dev/null
+say "job $job_id: dropped $fallback"
 
 echo "READY"
 exit 0
