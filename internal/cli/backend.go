@@ -124,7 +124,6 @@ fi
 
 job_id="$1"; user="$2"; title="$3"; copies="$4"; options="$5"; file="$6"
 SPOOL_DIR="` + spool + `"
-STAGE="/var/spool/cups/agentic-pdf"
 
 say() {
   echo "agentpdf: $*" >&2          # -> /var/log/cups/error_log (readable for debugging)
@@ -132,20 +131,40 @@ say() {
 }
 say "job $job_id: title='$title' file='$file'"
 
-mkdir -p "$STAGE" 2>/dev/null || { say "job $job_id: cannot create $STAGE"; exit 1; }
-
-# Only PDFs reach this backend (CUPS converts everything upstream). Guard
-# against surprises instead of deadlocking in a nested cupsfilter call.
-magic=$(head -c 4 "$file" 2>/dev/null)
-if [ "$magic" != "%PDF" ]; then
-  say "job $job_id: rejected non-PDF input"
+# Find a writable work directory: the cupsd sandbox denies most of the
+# filesystem, so probe rather than assume.
+WORKDIR=""
+for cand in "/var/tmp/agentic-pdf" "/tmp/agentic-pdf" "$SPOOL_DIR"; do
+  if mkdir -p "$cand" 2>/dev/null && touch "$cand/.wtest" 2>/dev/null; then
+    rm -f "$cand/.wtest"
+    WORKDIR="$cand"
+    say "job $job_id: workdir=$cand"
+    break
+  fi
+done
+if [ -z "$WORKDIR" ]; then
+  say "job $job_id: FAILED - no writable directory found"
   exit 1
 fi
 
-out="$STAGE/job-$job_id.pdf"
-"` + cliPath + `" print "$file" -o "$out" --title "$title" 2>&1 | while IFS= read -r line; do say "$line"; done
+# Job data arrives on stdin when CUPS pipes filtered output.
+in="$WORKDIR/in-$job_id.pdf"
+if [ -n "$file" ] && [ -r "$file" ]; then
+  cat "$file" > "$in"
+else
+  cat > "$in"
+fi
 
-if [ ! -s "$out" ]; then
+magic=$(head -c 4 "$in" 2>/dev/null)
+if [ "$magic" != "%PDF" ]; then
+  say "job $job_id: rejected non-PDF input"
+  rm -f "$in"
+  exit 1
+fi
+
+"` + cliPath + `" print "$in" -o "$in.out" --title "$title" 2>&1 | while IFS= read -r line; do say "$line"; done
+
+if [ ! -s "$in.out" ]; then
   say "job $job_id: FAILED - no output produced"
   exit 1
 fi
@@ -153,12 +172,14 @@ fi
 safe_title=$(printf '%s' "$title" | tr '/:' '__' | cut -c1-80)
 final="$SPOOL_DIR/$safe_title-$job_id.pdf"
 
-# Try direct delivery first; fall back to handing off via launchd user agent.
-if mv "$out" "$final" 2>/dev/null && chmod 644 "$final" 2>/dev/null; then
+if mv "$in.out" "$final" 2>/dev/null; then
+  chmod 644 "$final" 2>/dev/null
+  rm -f "$in"
   say "job $job_id: wrote $final"
 else
-  chmod 666 "$out" 2>/dev/null
-  say "job $job_id: delivered to staging: $out (spool dir not writable)"
+  mv "$in.out" "$WORKDIR/$safe_title-$job_id.pdf" 2>/dev/null
+  rm -f "$in"
+  say "job $job_id: spool not writable - left result in $WORKDIR/"
 fi
 
 echo "READY"
