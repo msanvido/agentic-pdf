@@ -119,7 +119,7 @@ func convertSpooledFile(path, outAbs string) error {
 	if err != nil {
 		return fmt.Errorf("extracting text: %w", err)
 	}
-	result, err := core.InjectAgentLayer(data, pages, "", "", "", "", true)
+	result, err := core.InjectAgentLayer(data, pages, "", "", "", "", "", true)
 	if err != nil {
 		return err
 	}

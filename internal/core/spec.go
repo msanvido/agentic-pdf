@@ -25,6 +25,7 @@ var MarkerKeywords = []string{"agent-readable", "agentic-pdf", "llm-readable"}
 
 type Frontmatter struct {
 	Title       string
+	Author      string
 	Description string
 	DocVersion  string
 	LastUpdated string
@@ -37,6 +38,9 @@ func (fm Frontmatter) Render() string {
 	var b strings.Builder
 	b.WriteString("---\n")
 	fmt.Fprintf(&b, "title: %q\n", fm.Title)
+	if fm.Author != "" {
+		fmt.Fprintf(&b, "author: %q\n", fm.Author)
+	}
 	fmt.Fprintf(&b, "description: %q\n", fm.Description)
 	fmt.Fprintf(&b, "doc_version: %q\n", fm.DocVersion)
 	fmt.Fprintf(&b, "last_updated: %q\n", fm.LastUpdated)

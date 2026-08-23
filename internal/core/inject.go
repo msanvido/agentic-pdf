@@ -15,8 +15,8 @@ import (
 // InjectAgentLayer embeds the agentic layer into a PDF:
 // agent.md + agent.html attachments, Title/Subject metadata, and the
 // AgentReadability / CanonicalSource custom Info keys.
-func InjectAgentLayer(pdfBytes []byte, pages []PageText, title, description, canonical, docVersion string, withHTML bool) ([]byte, error) {
-	markdown, fm := BuildAgentMarkdown(pages, title, description, canonical, docVersion)
+func InjectAgentLayer(pdfBytes []byte, pages []PageText, title, author, description, canonical, docVersion string, withHTML bool) ([]byte, error) {
+	markdown, fm := BuildAgentMarkdown(pages, title, description, canonical, docVersion, author)
 
 	dir, err := os.MkdirTemp("", "agentic-pdf-")
 	if err != nil {
@@ -124,6 +124,9 @@ func InjectAgentLayer(pdfBytes []byte, pages []PageText, title, description, can
 		InfoKey:   InfoValue,
 		"Creator": "agentic-pdf",
 	}
+	if author != "" {
+		props["Author"] = author
+	}
 	if canonical != "" {
 		props[CanonicalKey] = canonical
 	}
@@ -194,4 +197,20 @@ func ReadAttachments(pdfBytes []byte) ([]Attachment, error) {
 func ReadProperties(pdfBytes []byte) (map[string]string, error) {
 	conf := model.NewDefaultConfiguration()
 	return api.Properties(bytes.NewReader(pdfBytes), conf)
+}
+
+// PDFDocInfo is the subset of standard metadata we carry over.
+type PDFDocInfo struct {
+	Title  string
+	Author string
+}
+
+// ReadPDFInfo returns the document's standard metadata (title, author, …).
+func ReadPDFInfo(pdfBytes []byte) (*PDFDocInfo, error) {
+	conf := model.NewDefaultConfiguration()
+	info, err := api.PDFInfo(bytes.NewReader(pdfBytes), "", nil, false, conf)
+	if err != nil || info == nil {
+		return nil, err
+	}
+	return &PDFDocInfo{Title: info.Title, Author: info.Author}, nil
 }

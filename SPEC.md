@@ -51,7 +51,8 @@ The file MUST begin with a YAML frontmatter block containing:
 
 | Field          | Req.     | Description                                        |
 | -------------- | -------- | -------------------------------------------------- |
-| `title`        | MUST     | Document title; SHOULD match the visible title page |
+| `title`        | MUST     | Document title; SHOULD match the visible title page or the source PDF's Info `Title` |
+| `author`       | MAY      | Author(s), carried over from the source PDF when available |
 | `description`  | MUST     | ≥ 50 characters summarizing the document            |
 | `doc_version`  | MUST     | Version of *this document* (not of the spec)        |
 | `last_updated` | MUST     | ISO-8601 timestamp of last modification             |

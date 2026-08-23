@@ -108,7 +108,7 @@ func processInboxFile(path, outDir string) {
 		return // not ours / unreadable
 	}
 	base := filepath.Base(path)
-	title := "Printed document"
+	title := ""
 	// agentpdf.<jobid>.<title...>.<6-10 rand>.pdf
 	// claimed files carry an extra ".claim" suffix; drop it plus ".pdf",
 	// leaving agentpdf.<jobid>.<title...>.<rand>
@@ -119,15 +119,25 @@ func processInboxFile(path, outDir string) {
 		title = strings.Join(parts[1:len(parts)-1], ".") // drop jobid + rand
 	}
 	title = strings.TrimSpace(title)
-	if title == "" {
-		title = "Printed document"
-	}
+
 	pages, err := core.ExtractPages(data)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "⚠️  %s: %v\n", filepath.Base(path), err)
 		return
 	}
-	result, err := core.InjectAgentLayer(data, pages, title, "", "", "", true)
+	if title == "" {
+		if info, ierr := core.ReadPDFInfo(data); ierr == nil && info.Title != "" {
+			title = info.Title
+		}
+	}
+	if title == "" {
+		title = "Printed document"
+	}
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "⚠️  %s: %v\n", filepath.Base(path), err)
+		return
+	}
+	result, err := core.InjectAgentLayer(data, pages, title, "", "", "", "", true)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "⚠️  %s: %v\n", filepath.Base(path), err)
 		return
@@ -153,7 +163,7 @@ func receiveConvert(pdfBytes []byte, outDir, title string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("extracting text: %w", err)
 	}
-	result, err := core.InjectAgentLayer(pdfBytes, pages, title, "", "", "", true)
+	result, err := core.InjectAgentLayer(pdfBytes, pages, title, "", "", "", "", true)
 	if err != nil {
 		return "", err
 	}

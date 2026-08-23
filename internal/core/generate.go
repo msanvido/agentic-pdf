@@ -106,7 +106,7 @@ func renderInline(s string) string {
 
 // BuildAgentMarkdown assembles the full agent.md content per the spec:
 // frontmatter, agent note, summary, TOC, content, sitemap and glossary.
-func BuildAgentMarkdown(pages []PageText, title, description, canonical, docVersion string) (markdown string, fm Frontmatter) {
+func BuildAgentMarkdown(pages []PageText, title, description, canonical, docVersion, author string) (markdown string, fm Frontmatter) {
 	if title == "" {
 		title = GuessTitle(pages)
 	}
@@ -122,6 +122,7 @@ func BuildAgentMarkdown(pages []PageText, title, description, canonical, docVers
 
 	fm = Frontmatter{
 		Title:       title,
+		Author:      author,
 		Description: description,
 		DocVersion:  docVersion,
 		LastUpdated: time.Now().UTC().Format("2006-01-02T15:04:05Z"),

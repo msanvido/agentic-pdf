@@ -22,6 +22,17 @@ func Print(input, output, title, canonical string, withHTML bool) error {
 	if err != nil {
 		return err
 	}
+
+	// Carry over the original PDF's own metadata where the command didn't
+	// provide anything: an existing Info-dict Title beats a text-based guess.
+	var existingAuthor string
+	if info, ierr := core.ReadPDFInfo(pdfBytes); ierr == nil {
+		if title == "" {
+			title = info.Title
+		}
+		existingAuthor = info.Author
+	}
+
 	if canonical == "" {
 		if abs, aerr := filepath.Abs(input); aerr == nil {
 			canonical = "file://" + abs
@@ -31,7 +42,7 @@ func Print(input, output, title, canonical string, withHTML bool) error {
 	if err != nil {
 		return err
 	}
-	result, err := core.InjectAgentLayer(pdfBytes, pages, title, "", canonical, "", withHTML)
+	result, err := core.InjectAgentLayer(pdfBytes, pages, title, existingAuthor, "", canonical, "", withHTML)
 	if err != nil {
 		return err
 	}
