@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/msanvido/agentic-pdf/internal/core"
 )
@@ -72,10 +73,78 @@ func Receive(port int, outDir string) error {
 	addr := fmt.Sprintf("127.0.0.1:%d", port)
 	ln, err := net.Listen("tcp", addr)
 	if err != nil {
-		return fmt.Errorf("listening on %s: %w", addr, err)
+		// Another receiver (or a stale instance) owns the port. Exit cleanly
+		// so a KeepAlive supervisor does not crash-loop us.
+		fmt.Fprintf(os.Stderr, "receiver: %s already in use — another instance is running; exiting\n", addr)
+		os.Exit(0)
 	}
-	fmt.Printf("📥 receiver listening on %s\n   output: %s\n", addr, outDir)
+	fmt.Printf("📥 receiver listening on %s\n   output: %s\n   inbox:  /tmp/agentic-pdf-inbox\n", addr, outDir)
+
+	// Poll the CUPS-backend inbox: the sandboxed backend drops spooled PDFs
+	// there (network is denied inside the sandbox, filesystem writes to /tmp
+	// are not).
+	const inbox = "/tmp/agentic-pdf-inbox"
+	_ = os.MkdirAll(inbox, 0o777)
+	go func() {
+		for {
+			entries, _ := os.ReadDir(inbox)
+			for _, e := range entries {
+				path := filepath.Join(inbox, e.Name())
+				if strings.HasSuffix(path, ".title") {
+					continue
+				}
+				if processInboxFile(path, outDir) {
+					os.Remove(path)
+					titlePath := strings.TrimSuffix(path, ".pdf") + ".title"
+					os.Remove(titlePath)
+				}
+			}
+			time.Sleep(time.Second)
+		}
+	}()
+
 	return http.Serve(ln, mux)
+}
+
+// processInboxFile converts one spooled PDF; returns true when handled.
+func processInboxFile(path, outDir string) bool {
+	data, err := os.ReadFile(path)
+	if err != nil || len(data) < 5 || string(data[:4]) != "%PDF" {
+		return false // not ours / still being written / unreadable
+	}
+	titleBytes, _ := os.ReadFile(strings.TrimSuffix(path, ".pdf") + ".title")
+	title := strings.TrimSpace(string(titleBytes))
+	fmt.Fprintf(os.Stderr, "[debug] inbox=%s titleBytes=%d title=%q\n", path, len(titleBytes), title)
+	if title == "" {
+		// Title sidecar may land a moment after the data file; retry once.
+		time.Sleep(400 * time.Millisecond)
+		titleBytes, _ = os.ReadFile(strings.TrimSuffix(path, ".pdf") + ".title")
+		title = strings.TrimSpace(string(titleBytes))
+	}
+	if title == "" {
+		title = "Printed document"
+	}
+	pages, err := core.ExtractPages(data)
+	if err != nil {
+		return false // maybe still being written; retry next tick
+	}
+	result, err := core.InjectAgentLayer(data, pages, title, "", "", "", true)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "⚠️  %s: %v\n", filepath.Base(path), err)
+		return true // don't loop forever on broken files
+	}
+	name := fmt.Sprintf("%s (printed).pdf", title)
+	out := filepath.Join(outDir, name)
+	tmp := out + ".part"
+	if err := os.WriteFile(tmp, result, 0o644); err != nil {
+		return false
+	}
+	if err := os.Rename(tmp, out); err != nil {
+		return false
+	}
+	fmt.Fprintf(os.Stderr, "✅ printed → %s\n", out)
+	notifyUser("Agentic PDF ready", filepath.Base(out))
+	return true
 }
 
 var spacesRE = regexp.MustCompile(`\s+`)

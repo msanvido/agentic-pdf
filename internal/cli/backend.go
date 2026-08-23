@@ -8,7 +8,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
-	"strconv"
 	"strings"
 )
 
@@ -127,8 +126,15 @@ func installReceiveAgent(exe string, port int, spool string) error {
 		return err
 	}
 	tryRun("launchctl", "unload", plist)
-	if err := exec.Command("launchctl", "load", plist).Run(); err != nil {
-		return fmt.Errorf("loading receiver LaunchAgent: %w", err)
+	// CRITICAL: load into the invoking user's gui domain. Running plain
+	// `launchctl load` under sudo registers the agent in the ROOT domain,
+	// spawning a root-owned receiver that races the user's instance.
+	if u := os.Getenv("SUDO_USER"); u != "" && u != "root" {
+		run("sudo", "-u", u, "launchctl", "load", plist)
+	} else {
+		if err := exec.Command("launchctl", "load", plist).Run(); err != nil {
+			return fmt.Errorf("loading receiver LaunchAgent: %w", err)
+		}
 	}
 	return nil
 }
@@ -171,45 +177,39 @@ say() {
   logger -t agentpdf "$*" 2>/dev/null
 }
 
-PORT=` + strconv.Itoa(port) + `
-URL="http://127.0.0.1:$PORT/print"
+INBOX=/tmp/agentic-pdf-inbox
+mkdir -p "$INBOX" 2>/dev/null || exit 1
 
-# Read job data (stdin) or spool file into a temp buffer in /tmp — one of
-# the few writable locations inside the backend sandbox.
-tmp_in=$(mktemp /tmp/agentpdf.XXXXXX)
+# The sandbox denies network access, so instead of connecting anywhere we
+# drop the spooled PDF into a world-readable inbox. The user-space receiver
+# ('agentic-pdf receive') polls it every second and does conversion +
+# delivery with normal user permissions.
+
 if [ -n "$file" ] && [ -r "$file" ]; then
-  cat "$file" > "$tmp_in"
+  src="$file"
 else
-  cat > "$tmp_in"
+  src="-"   # job data arrives on stdin
 fi
 
-# Forward everything to the receiver; it does validation and logging.
-rc=$(curl -s --max-time 120 \
-      -H "X-Job-Id: $job_id" \
-      -H "X-Job-Title: $title" \
-      --data-binary @"$tmp_in" \
-      -o /dev/null -w "%{http_code}" \
-      "$URL" 2>>"$tmp_in.err")
-rc_code=$?
-if [ "$rc" != "200" ]; then
-  say "job $job_id: curl rc=$rc_code http=$rc stderr=$(head -c 200 "$tmp_in.err" 2>/dev/null | tr '\n' ' ')"
-  # Fallback 1: nc
-  if command -v nc >/dev/null 2>&1; then
-    { printf 'POST /print HTTP/1.0\r\nContent-Type: application/pdf\r\nX-Job-Id: %s\r\nX-Job-Title: %s\r\nContent-Length: %s\r\n\r\n' "$job_id" "$title" "$(wc -c < "$tmp_in")"; cat "$tmp_in"; } | nc -w 120 127.0.0.1 $PORT > "$tmp_in.resp" 2>>"$tmp_in.err"
-    rc_code=$?
-    grep -q "READY" "$tmp_in.resp" 2>/dev/null && rc=200
-    say "job $job_id: nc fallback rc_code=$rc_code"
-  fi
-fi
-rm -f "$tmp_in" "$tmp_in.err" "$tmp_in.resp"
+data="$INBOX/job-$job_id.pdf"
+title_file="$INBOX/job-$job_id.pdf.title"
 
-if [ "$rc" = "200" ]; then
-  say "job $job_id: delivered via receiver"
-  echo "READY"
-  exit 0
+# Write the title sidecar BEFORE the data file: the receiver processes as
+# soon as the .pdf appears.
+printf '%s' "$title" > "$title_file" 2>/dev/null
+chmod 644 "$title_file" 2>/dev/null
+
+if [ "$src" = "-" ]; then
+  cat > "$data.tmp" || { say "job $job_id: cannot read stdin"; exit 1; }
+else
+  cat "$src" > "$data.tmp" || { say "job $job_id: cannot copy spool file"; exit 1; }
 fi
-say "job $job_id: receiver error HTTP $rc (is 'agentic-pdf receive' running?)"
-exit 1
+chmod 644 "$data.tmp" 2>/dev/null
+mv "$data.tmp" "$data"
+say "job $job_id: dropped $data"
+
+echo "READY"
+exit 0
 `
 }
 
