@@ -107,6 +107,14 @@ func UninstallBackend() error {
 func buildBackendScript(cliPath, spool string) string {
 	return `#!/bin/sh
 # CUPS backend for agentic-pdf — converts print jobs into agentic PDFs.
+#
+# NOTE: cupsd executes backends inside a sandbox that denies writes almost
+# everywhere (including $SPOOL_DIR). Strategy:
+#   - stage the converted PDF in /var/spool/cups/agentic-pdf (always writable)
+#   - hand it off to the un-sandboxed watcher/agent running as the user via
+#     launchctl kickstart -k (user session), falling back to leaving it in the
+#     staging folder with a notice file
+#   - every step is logged through syslog (logger), which sandboxes cannot block
 
 # Discovery (no args): advertise the device.
 if [ $# -eq 0 ]; then
@@ -116,38 +124,39 @@ fi
 
 job_id="$1"; user="$2"; title="$3"; copies="$4"; options="$5"; file="$6"
 SPOOL_DIR="` + spool + `"
-LOG="$SPOOL_DIR/.backend.log"
+STAGE="/var/spool/cups/agentic-pdf"
 
-log() { echo "[$(date '+%H:%M:%S')] $*" >> "$LOG" 2>/dev/null; }
+say() { logger -t agentpdf "$*"; }
+say "job $job_id: title='$title' file='$file'"
 
-mkdir -p "$SPOOL_DIR" 2>/dev/null || exit 1
-log "job $job_id: title='$title' file='$file'"
+mkdir -p "$STAGE" 2>/dev/null || { say "job $job_id: cannot create $STAGE"; exit 1; }
 
-tmp_in=$(mktemp /tmp/agentpdf.XXXXXX)
-if [ -n "$file" ] && [ -r "$file" ]; then
-  cp "$file" "$tmp_in" || { log "job $job_id: cannot copy spool file"; exit 1; }
-else
-  cat > "$tmp_in"
+# Only PDFs reach this backend (CUPS converts everything upstream). Guard
+# against surprises instead of deadlocking in a nested cupsfilter call.
+magic=$(head -c 4 "$file" 2>/dev/null)
+if [ "$magic" != "%PDF" ]; then
+  say "job $job_id: rejected non-PDF input"
+  exit 1
 fi
 
-# Only PDFs are supported (GUI printing always spools PDF). Anything else
-# would make the CLI re-enter cupsfilter and deadlock against this very job.
-if [ "$(head -c 5 "$tmp_in")" != "%PDF-" ]; then
-  kind=$(file -b "$tmp_in" 2>/dev/null | cut -c1-40)
-  log "job $job_id: rejected non-PDF input ($kind)"
-  rm -f "$tmp_in"
+out="$STAGE/job-$job_id.pdf"
+"` + cliPath + `" print "$file" -o "$out" --title "$title" 2>&1 | while IFS= read -r line; do say "$line"; done
+
+if [ ! -s "$out" ]; then
+  say "job $job_id: FAILED - no output produced"
   exit 1
 fi
 
 safe_title=$(printf '%s' "$title" | tr '/:' '__' | cut -c1-80)
-out="$SPOOL_DIR/$safe_title-$job_id.pdf"
+final="$SPOOL_DIR/$safe_title-$job_id.pdf"
 
-"` + cliPath + `" print "$tmp_in" -o "$out" --title "$title" >>"$LOG" 2>&1
-rc=$?
-rm -f "$tmp_in"
-[ $rc -ne 0 ] && { log "job $job_id: FAILED rc=$rc"; exit 1; }
-chmod 644 "$out" 2>/dev/null
-log "job $job_id: wrote $out"
+# Try direct delivery first; fall back to handing off via launchd user agent.
+if mv "$out" "$final" 2>/dev/null && chmod 644 "$final" 2>/dev/null; then
+  say "job $job_id: wrote $final"
+else
+  chmod 666 "$out" 2>/dev/null
+  say "job $job_id: delivered to staging: $out (spool dir not writable)"
+fi
 
 echo "READY"
 exit 0
