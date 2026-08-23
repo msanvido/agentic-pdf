@@ -191,6 +191,24 @@ say() {
   logger -t agentpdf "$*" 2>/dev/null
 }
 
+# --- capability probe (temporary diagnostics) -------------------------
+probe() { # $1=label $2=command
+  out=$($2 2>&1); r=$?
+  say "probe $1: rc=$r out=$out"
+}
+probe "mktemp-tmp"     "mktemp /tmp/probe.XXXXXX"
+probe "mkdir-vartmp"   "mkdir -p /var/tmp/agentic-probe"
+probe "write-vartmp"   "echo x > /var/tmp/agentic-probe/f"
+probe "nc-localhost"   "echo ping | nc -w 2 -G 2 127.0.0.1 ${port} "
+probe "curl-localhost" "curl -s -m 3 -o /dev/null -w '%{http_code}' http://127.0.0.1:${port}/health"
+probe "exec-cli"       "` + cliPath + ` --version"
+# ----------------------------------------------------------------------
+
+say() {
+  echo "agentpdf: $*" >&2          # -> /var/log/cups/error_log
+  logger -t agentpdf "$*" 2>/dev/null
+}
+
 # Only the mktemp-style file primitive is guaranteed writable inside the
 # cupsd sandbox, so the payload lands as /tmp/agentpdf.<jobid>.<title>.XXXXXX.pdf
 # and the user-space receiver picks up that glob.
