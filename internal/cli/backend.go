@@ -118,10 +118,10 @@ func installReceiveAgent(exe string, port int, spool string) error {
     </array>
     <key>RunAtLoad</key><true/>
     <key>KeepAlive</key><true/>
-    <key>StandardErrorPath</key><string>/tmp/agentic-pdf-receive.log</string>
+    <key>StandardErrorPath</key><string>%s/.receive.log</string>
 </dict>
 </plist>
-`, receiveLabel, exe, port, spool)
+`, receiveLabel, exe, spool, spool, port)
 	if err := os.WriteFile(plist, []byte(content), 0o644); err != nil {
 		return err
 	}

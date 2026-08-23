@@ -106,7 +106,7 @@ func installWatchMac(exe, spool, outDir string) error {
     </array>
     <key>RunAtLoad</key><true/>
     <key>KeepAlive</key><true/>
-    <key>StandardErrorPath</key><string>/tmp/agentic-pdf-watch.log</string>
+    <key>StandardErrorPath</key><string>%s/.watch.log</string>
 </dict>
 </plist>
 `, macPlistLabel, exe, spool, outDir)
