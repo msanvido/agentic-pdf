@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"runtime"
 	"strings"
 )
@@ -18,8 +17,9 @@ func toJSON(v any) string {
 // InstallBackend installs the CUPS virtual printer (macOS/Linux with CUPS).
 func InstallBackend(spool string) error {
 	if spool == "" {
-		home, _ := os.UserHomeDir()
-		spool = filepath.Join(home, "Documents", "Agentic-PDF")
+		// /Users/Shared is world-writable AND not TCC-protected; cupsd runs
+		// sandboxed and cannot write into ~/Documents even as root.
+		spool = "/Users/Shared/Agentic-PDF"
 	}
 	exe, err := os.Executable()
 	if err != nil {
@@ -31,8 +31,14 @@ func InstallBackend(spool string) error {
 	if err := os.WriteFile(tmpScript, []byte(script), 0o755); err != nil {
 		return err
 	}
-	if err := os.MkdirAll(spool, 0o755); err != nil {
+	if err := os.MkdirAll(spool, 0o777); err != nil {
 		return err
+	}
+	// When running under sudo, hand the spool dir back to the invoking user
+	// (cupsd runs as root and can write anywhere except TCC-protected paths).
+	owner := os.Getenv("SUDO_USER")
+	if owner == "" {
+		owner = os.Getenv("USER")
 	}
 
 	fmt.Fprintln(os.Stderr, "Installing CUPS backend (requires sudo)…")
@@ -40,10 +46,21 @@ func InstallBackend(spool string) error {
 	run("sudo", "chown", "root:wheel", "/usr/libexec/cups/backend/agentpdf")
 	run("sudo", "chmod", "755", "/usr/libexec/cups/backend/agentpdf")
 	run("sudo", "mkdir", "-p", spool)
-	if u := os.Getenv("USER"); u != "" {
-		run("sudo", "chown", u+":staff", spool)
+	run("sudo", "chmod", "1777", spool)
+	if owner != "" && owner != "root" {
+		run("sudo", "chown", owner, spool)
 	}
-	run("sudo", "lpadmin", "-p", "AgenticPDF", "-E", "-v", "agentpdf:"+spool, "-D", "Agentic PDF Printer")
+	// Generic PPD: without a model attached, the macOS print dialog rejects
+	// the queue with "Something went wrong when trying to print".
+	run("sudo", "lpadmin", "-p", "AgenticPDF",
+		"-v", "agentpdf:"+spool,
+		"-m", "drv:///sample.drv/generic.ppd",
+		"-D", "Agentic PDF Printer")
+	// A single backend failure must not stop the queue.
+	run("sudo", "lpadmin", "-p", "AgenticPDF",
+		"-o", "printer-error-policy=retry-current-job")
+	run("sudo", "lpadmin", "-p", "AgenticPDF", "-E")
+	run("sudo", "cupsenable", "AgenticPDF")
 	run("sudo", "launchctl", "kickstart", "-k", "system/org.cups.cupsd")
 
 	fmt.Printf(`✅ Installed "Agentic PDF Printer".
@@ -78,12 +95,16 @@ fi
 
 job_id="$1"; user="$2"; title="$3"; copies="$4"; options="$5"; file="$6"
 SPOOL_DIR="` + spool + `"
+LOG="$SPOOL_DIR/.backend.log"
+
+log() { echo "[$(date '+%H:%M:%S')] $*" >> "$LOG" 2>/dev/null; }
 
 mkdir -p "$SPOOL_DIR" 2>/dev/null || exit 1
+log "job $job_id: title='$title' file='$file'"
 
 tmp_in=$(mktemp /tmp/agentpdf.XXXXXX)
 if [ -n "$file" ] && [ -r "$file" ]; then
-  cp "$file" "$tmp_in"
+  cp "$file" "$tmp_in" || { log "job $job_id: cannot copy spool file"; exit 1; }
 else
   cat > "$tmp_in"
 fi
@@ -91,11 +112,12 @@ fi
 safe_title=$(printf '%s' "$title" | tr '/:' '__' | cut -c1-80)
 out="$SPOOL_DIR/$safe_title-$job_id.pdf"
 
-"` + cliPath + `" print "$tmp_in" -o "$out" --title "$title" >/dev/null 2>&1
+"` + cliPath + `" print "$tmp_in" -o "$out" --title "$title" >>"$LOG" 2>&1
 rc=$?
 rm -f "$tmp_in"
-[ $rc -ne 0 ] && { echo "ERROR: agentic conversion failed"; exit 1; }
+[ $rc -ne 0 ] && { log "job $job_id: FAILED rc=$rc"; exit 1; }
 chmod 644 "$out" 2>/dev/null
+log "job $job_id: wrote $out"
 
 echo "READY"
 exit 0
